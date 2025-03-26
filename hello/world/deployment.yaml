@@ -14,6 +14,6 @@ spec:
     spec:
       containers:
         - name: hello-world
-          image: your-dockerhub-username/hello-world-app:latest
+          image: localhost:32000/hello-world-app:latest
           ports:
             - containerPort: 5000
