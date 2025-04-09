@@ -11,6 +11,4 @@ while(True):
                           routing_key='hello',
                           body='Hello World!')
     print(" [x] Sent 'Hello World!'")
-    #time.sleep(2)
-
-connection.close()
+    time.sleep(2)
