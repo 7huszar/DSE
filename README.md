@@ -18,6 +18,6 @@ microk8s enable registry
 
 - sudo docker push localhost:32000/hello-world-app:latest
 
-- sudo microk8s kubectl apply -f deploymnet.yaml
+- sudo microk8s kubectl apply -f deployment.yaml
 
 - sudo microk8s kubectl apply -f service.yaml 
