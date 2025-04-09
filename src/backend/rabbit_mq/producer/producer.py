@@ -1,7 +1,7 @@
-import pika, time
+import pika, time, os
 
-credentials = pika.PlainCredentials(username="default_user_ICJsYCAzYCEDta2cePt", password="Zxs3J46nfIVOmzl6RuI474DvWJq0CkVD")
-connection = pika.BlockingConnection(pika.ConnectionParameters(host='10.152.183.92', port='5672', credentials=credentials))
+credentials = pika.PlainCredentials(username= os.environ['RABBITMQ_USER'], password=os.environ['RABBITMQ_PASSWORD'])
+connection = pika.BlockingConnection(pika.ConnectionParameters(host=os.environ['RABBITMQ_HOST'], port=os.environ['RABBITMQ_PORT'], credentials=credentials))
 channel = connection.channel()
 
 channel.queue_declare(queue='hello')

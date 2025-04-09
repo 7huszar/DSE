@@ -17,3 +17,6 @@ spec:
           image: localhost:32000/producer:latest
           ports:
             - containerPort: 5672
+          envFrom:
+            - configMapRef:
+                name: rabbit-mq-configmap
