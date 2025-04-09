@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cd-postgres
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cd-postgres
+  template:
+    metadata:
+      labels:
+        app: cd-postgres
+    spec:
+      containers:
+        - name: postgres
+          image: 'postgres:14'
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 5432
+          envFrom:
+            - configMapRef:
+                name: cd-postgres-secret
+          volumeMounts:
+            - mountPath: /var/lib/postgresql/data
+              name: cd-postgresdata
+      volumes:
+        - name: cd-postgresdata
+          persistentVolumeClaim:
+            claimName: cd-postgres-volume-claim
