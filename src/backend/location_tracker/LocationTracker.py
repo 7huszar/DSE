@@ -1,6 +1,7 @@
 import threading
 import pika
 import json
+import os
 from flask import Flask
 
 app = Flask(__name__)
@@ -16,7 +17,9 @@ def callback(ch, method, properties, body):
     print(f'{str(received_cnt)}, {msg}\n')
 
 def run_consumer():
-    connection = pika.BlockingConnection(pika.ConnectionParameters('rabbitmq-service'))
+    credentials = pika.PlainCredentials(username= os.environ['RABBITMQ_USER'], password=os.environ['RABBITMQ_PASSWORD'])
+    connection = pika.BlockingConnection(pika.ConnectionParameters(host='rabbitmq', port=os.environ['RABBITMQ_PORT'], credentials=credentials))
+
     channel = connection.channel()
 
     channel.exchange_declare(exchange='broker', exchange_type='topic')
