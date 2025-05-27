@@ -23,8 +23,8 @@ logger = logging.getLogger(__name__)
 
 # RabbitMQ connection
 credentials = pika.PlainCredentials(
-    username=os.environ.get('RABBITMQ_USER', 'guest'),
-    password=os.environ.get('RABBITMQ_PASSWORD', 'guest')
+    username=os.environ['RABBITMQ_USER'],
+    password=os.environ['RABBITMQ_PASSWORD']
 )
 
 def get_rabbitmq_connection():
@@ -69,7 +69,7 @@ def receive_data():
 
     channel.basic_publish(
         exchange='broker',
-        routing_key='backend.location.passenger',
+        routing_key='backend.locat  ion.passenger',
         body=json.dumps(data).encode("utf-8")
     )
 

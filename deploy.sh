@@ -31,6 +31,9 @@ while IFS= read -r VIN; do
 
   envsubst < ./src/vehicle/location_sender/service.yaml | microk8s kubectl apply -f -
 
+  microk8s kubectl rollout restart deployment/location-sender-"$VIN_LOWER"
+
+
 done < TestData.txt
 
 microk8s kubectl create configmap vin-config --from-file=TestData.txt=TestData.txt
