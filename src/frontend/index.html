@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>STEEER Visor - Vehicle Monitoring System</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -288,37 +289,61 @@
                 }).addTo(this.map);
             },
 
+            // Innerhalb von new Vue({ ... methods: { HIER } ... })
+
             connectToBackend() {
-                // Connect to WebSocket for real-time updates
                 try {
-                    // WebSocket URL through nginx proxy
-                    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-                    const wsUrl = `${wsProtocol}//${window.location.host}/ws`;
-                    this.ws = new WebSocket(wsUrl);
+                    // NEUE METHODE mit Socket.IO Client:
+                    // Dein Nginx (frontend/nginx.conf) ist so konfiguriert:
+                    // location /ws { proxy_pass http://passenger-service:8080/socket.io/; }
+                    //
+                    // Der Socket.IO-Client verbindet sich. Der 'path' Parameter sagt dem Client,
+                    // unter welchem Pfad auf dem Frontend-Server die Socket.IO-Kommunikation beginnt.
+                    // Nginx fängt Anfragen an diesen Pfad ab und leitet sie an den '/socket.io/'
+                    // Endpunkt des Backends weiter.
+                    this.ws = io(window.location.origin, { // Verbinde mit dem aktuellen Host und Port
+                        path: "/ws"  // Der Basispfad, den Nginx für Socket.IO-Anfragen matched.
+                                     // Socket.IO Client wird Anfragen wie /ws/?EIO=4... senden.
+                                     // Nginx leitet alles unter /ws an /socket.io/ im Backend weiter.
+                    });
 
-                    this.ws.onopen = () => {
+                    this.ws.on('connect', () => {
                         this.connected = true;
-                        this.addEvent('Connected to backend');
-                    };
+                        this.addEvent('Socket.IO: Connected to backend'); // Angepasste Meldung
+                    });
 
-                    this.ws.onmessage = (event) => {
-                        const data = JSON.parse(event.data);
-                        this.handleRealtimeUpdate(data);
-                    };
-
-                    this.ws.onerror = (error) => {
-                        console.error('WebSocket error:', error);
+                    this.ws.on('disconnect', (reason) => {
                         this.connected = false;
-                    };
+                        this.addEvent(`Socket.IO: Disconnected from backend (${reason})`);
+                        // Socket.IO hat eingebaute Wiederverbindungslogik.
+                        // Ein manueller setTimeout ist oft nicht mehr nötig.
+                    });
 
-                    this.ws.onclose = () => {
+                    this.ws.on('connect_error', (error) => {
+                        console.error('Socket.IO connection error:', error);
                         this.connected = false;
-                        this.addEvent('Disconnected from backend');
-                        // Attempt to reconnect after 5 seconds
-                        setTimeout(() => this.connectToBackend(), 5000);
-                    };
+                        this.addEvent('Socket.IO: Connection error');
+                    });
+
+                    // Dein Backend (passenger.py) sendet ein Event namens 'vehicle_update'.
+                    // Du musst hier auf genau diesen Event-Namen lauschen.
+                    this.ws.on('vehicle_update', (dataFromServer) => {
+                        // dataFromServer ist bereits das vom Server gesendete Objekt,
+                        // kein JSON-String mehr, der geparst werden muss.
+                        this.handleRealtimeUpdate(dataFromServer);
+                    });
+
+                    // Wenn dein Backend beim Verbindungsaufbau ein 'connected'-Event sendet
+                    // (wie in deinem passenger.py @socketio.on('connect') def handle_connect(): emit('connected', ...)),
+                    // dann lausche auch darauf:
+                    this.ws.on('connected', (serverAckData) => {
+                        console.log('Server acknowledgement/event "connected":', serverAckData);
+                        // Hier kannst du auf die Bestätigung vom Server reagieren, falls nötig.
+                        // Zum Beispiel die `this.connected` Flag setzen, falls nicht schon durch den 'connect' Event geschehen.
+                    });
+
                 } catch (error) {
-                    console.error('Failed to connect to WebSocket:', error);
+                    console.error('Failed to initialize Socket.IO client:', error);
                     this.connected = false;
                 }
             },
