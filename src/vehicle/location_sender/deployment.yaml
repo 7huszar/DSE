@@ -17,3 +17,23 @@ spec:
           image: localhost:32000/location-sender:latest
           ports:
             - containerPort: 5000
+          env:
+            - name: RABBITMQ_USER
+              value: "dse"
+            - name: RABBITMQ_PASSWORD
+              value: "dse123"
+            - name: RABBITMQ_PORT
+              value: "5672"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: location-sender-service
+spec:
+  selector:
+    app: location-sender
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 5000
+  type: LoadBalancer
