@@ -5,11 +5,11 @@ FROM python:3.9-slim
 WORKDIR /DataMock
 
 # Copy the application code
-COPY DataMock.py.py /DataMock
-COPY Vehicle.py /DataMock
+COPY DataMock.py /DataMock
+COPY vehicle_module.py /DataMock
 
 # Install dependencies
-RUN pip install flask
+RUN pip install flask requests
 
 # Expose the application port
 EXPOSE 5000

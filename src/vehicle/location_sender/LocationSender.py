@@ -3,8 +3,16 @@ import threading
 import pika
 import os
 from flask import Flask, request, jsonify
+import logging
 
 app = Flask(__name__)
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+)
+logger = logging.getLogger(__name__)
+
 
 credentials = pika.PlainCredentials(username= os.environ['RABBITMQ_USER'], password=os.environ['RABBITMQ_PASSWORD'])
 connection = pika.BlockingConnection(pika.ConnectionParameters(host='rabbitmq', port=os.environ['RABBITMQ_PORT'], credentials=credentials))
