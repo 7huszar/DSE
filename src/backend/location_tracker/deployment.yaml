@@ -17,3 +17,11 @@ spec:
           image: localhost:32000/location-tracker:latest
           ports:
             - containerPort: 5000
+          envFrom:
+            - configMapRef:
+                name: rabbit-mq-configmap
+            - configMapRef:
+                name: location-tracker-configmap
+
+
+

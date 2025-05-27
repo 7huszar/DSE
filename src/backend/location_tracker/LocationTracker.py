@@ -9,22 +9,24 @@ app = Flask(__name__)
 received_cnt = 0
 msg = []
 
+
+
+
+
 def callback(ch, method, properties, body):
     global received_cnt
     received_cnt += 1
     global msg
-    msg.append(body)
+    msg.append(body.decode('UTF-8'))
     print(f'{str(received_cnt)}, {msg}\n')
 
 def run_consumer():
     credentials = pika.PlainCredentials(username= os.environ['RABBITMQ_USER'], password=os.environ['RABBITMQ_PASSWORD'])
-    connection = pika.BlockingConnection(pika.ConnectionParameters(host='rabbitmq', port=os.environ['RABBITMQ_PORT'], credentials=credentials))
+    connection = pika.BlockingConnection(pika.ConnectionParameters(host="rabbitmq", port=os.environ['RABBITMQ_PORT'], credentials=credentials, virtual_host="/"))
 
     channel = connection.channel()
-
+    print("Started consumer with connection to RabbitMQ!")
     channel.exchange_declare(exchange='broker', exchange_type='topic')
-
-
     result = channel.queue_declare('', exclusive=False)
     queue_name = result.method.queue
 

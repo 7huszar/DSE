@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: location-tracker-configmap
+  labels:
+    app: location-tracker
+data:
+  LT_POSTGRES_USER: "admin"
+  LT_POSTGRES_PASSWORD: "admin"
+  LT_POSTGRES_HOST: "lt-postgres"
+  LT_POSTGRES_PORT: "5432"
+  CD_POSTGRES_USER: "admin"
+  CD_POSTGRES_PASSWORD: "admin"
+  CD_POSTGRES_HOST: "cd-postgres"
+  CD_POSTGRES_PORT: "5432"

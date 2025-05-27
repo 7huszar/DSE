@@ -5,7 +5,7 @@ metadata:
   labels:
     app: rabbitmq
 data:
-  RABBITMQ_USER: "default_user_ICJsYCAzYCEDta2cePt"
-  RABBITMQ_PASSWORD: "Zxs3J46nfIVOmzl6RuI474DvWJq0CkVD"
-  RABBITMQ_HOST: "10.152.183.92"
+  RABBITMQ_USER: "default_user_mmoo_kJ1le22SejGNxd"
+  RABBITMQ_PASSWORD: "nlKDPvbaICRsC2DpPDAeaIuPNyYAKV7s"
+  RABBITMQ_HOST: "rabbitmq"
   RABBITMQ_PORT: "5672"
