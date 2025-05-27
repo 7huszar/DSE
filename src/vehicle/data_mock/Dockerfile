@@ -10,6 +10,7 @@ COPY vehicle_module.py /DataMock
 
 # Install dependencies
 RUN pip install flask requests
+RUN pip install numpy
 
 # Expose the application port
 EXPOSE 5000
