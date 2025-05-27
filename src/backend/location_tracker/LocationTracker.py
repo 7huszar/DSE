@@ -7,13 +7,13 @@ from flask import Flask
 app = Flask(__name__)
 
 received_cnt = 0
-msg = ''
+msg = []
 
 def callback(ch, method, properties, body):
     global received_cnt
     received_cnt += 1
     global msg
-    msg = json.loads(body.decode('UTF-8')).get('key')
+    msg.append(body)
     print(f'{str(received_cnt)}, {msg}\n')
 
 def run_consumer():

@@ -1,0 +1,28 @@
+import math
+
+import time
+
+class Vehicle:
+    def __init__(self, longitude, latitude, velocity=0.0, acceleration=0.0, direction=[1.0, 0.0]):
+        self.longitude = longitude
+        self.latitude = latitude
+        self.velocity = velocity
+        self.acceleration = acceleration
+        self.direction = direction
+        self.internal_time = time.time()
+
+    earth_radius = 6371000
+
+    def sample(self, acceleration, direction):
+        delta_time = time.time() - self.internal_time
+        self.internal_time += delta_time
+
+        distance = self.velocity * delta_time
+
+        dx = self.direction[0] * distance
+        dy = self.direction[1] * distance
+
+        self.latitude += (dy / self.earth_radius) * (180 / math.pi)
+        self.longitude += (dx / (self.earth_radius * math.cos(math.radians(self.latitude)))) * (180 / math.pi)
+
+        return [self.latitude, self.longitude, self.internal_time]

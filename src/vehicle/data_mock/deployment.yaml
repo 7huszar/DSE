@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: data-mock
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: data-mock
+  template:
+    metadata:
+      labels:
+        app: data-mock
+    spec:
+      containers:
+        - name: data-mock
+          image: localhost:32000/data-mock:latest
+          ports:
+            - containerPort: 5000
