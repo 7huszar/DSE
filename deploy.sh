@@ -21,6 +21,7 @@ microk8s kubectl apply -f ./src/vehicle/data_mock/deployment.yaml
 
 echo "apply configmaps"
 microk8s kubectl apply -f ./src/backend/rabbit_mq/rabbitmq-configmap.yaml
+microk8s kubectl apply -f ./src/backend/location_tracker/location-tracker-configmap.yaml
 
 
 echo "apply service files"
