@@ -10,6 +10,7 @@ COPY LocationTracker.py /LocationTracker
 # Install dependencies
 RUN pip install flask
 RUN pip install pika
+RUN pip install psycopg2-binary
 
 # Expose the application port
 EXPOSE 5000
