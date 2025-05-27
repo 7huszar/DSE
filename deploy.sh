@@ -74,5 +74,5 @@ microk8s kubectl rollout restart deployment/location-sender
 microk8s kubectl rollout restart deployment/data-mock
 microk8s kubectl rollout restart deployment/passenger
 microk8s kubectl rollout restart deployment/visor
-microk8s kubectl rollout restart deployment/lt-postgres
-microk8s kubectl rollout restart deployment/cd-postgres
+#microk8s kubectl rollout restart deployment/lt-postgres
+#microk8s kubectl rollout restart deployment/cd-postgres

@@ -43,20 +43,20 @@ def update_car(vehicle):
     new_coord = vehicle.sample(48.192701205090565, 16.37814270634505)
 
     if(last_distance_front == 0):
-        distance_front = random.sample(np.arange(MIN_DISTANCE_FRONT, MAX_DISTANCE_FRONT, 0.1),1)[0]
+        distance_front = random.choice(np.arange(MIN_DISTANCE_FRONT, MAX_DISTANCE_FRONT, 0.1))
     else:
         distance_front = 0
         while(distance_front < MIN_DISTANCE_FRONT or distance_front > MAX_DISTANCE_FRONT):
-            distance_front = random.sample(np.arange((1-MAX_CHANGE_RATE_PERCENT)*last_distance_front,(1+MAX_CHANGE_RATE_PERCENT)*last_distance_front, 0.1),1)[0]
+            distance_front = random.choice(np.arange((1-MAX_CHANGE_RATE_PERCENT)*last_distance_front,(1+MAX_CHANGE_RATE_PERCENT)*last_distance_front, 0.1))
 
     last_distance_front = distance_front
 
     if(last_distance_back == 0):
-        distance_back = random.sample(np.arange(MIN_DISTANCE_BACK, MAX_DISTANCE_BACK, 0.1),1)[0]
+        distance_back = random.choice(np.arange(MIN_DISTANCE_BACK, MAX_DISTANCE_BACK, 0.1))
     else:
         distance_back = 0
         while(distance_back < MIN_DISTANCE_BACK or distance_back > MAX_DISTANCE_BACK):
-            distance_back = random.sample(np.arange((1-MAX_CHANGE_RATE_PERCENT)*last_distance_back,(1+MAX_CHANGE_RATE_PERCENT)*last_distance_back, 0.1),1)[0]
+            distance_back = random.choice(np.arange((1-MAX_CHANGE_RATE_PERCENT)*last_distance_back,(1+MAX_CHANGE_RATE_PERCENT)*last_distance_back, 0.1))
 
     last_distance_back = distance_back
 
