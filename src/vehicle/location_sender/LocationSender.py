@@ -67,6 +67,12 @@ def receive_data():
         body=json.dumps(data).encode("utf-8")
     )
 
+    channel.basic_publish(
+        exchange='broker',
+        routing_key='backend.location.passenger',
+        body=json.dumps(data).encode("utf-8")
+    )
+
     return jsonify({"status": "ok"}), 200
 
 @app.route('/health', methods=['GET'])
