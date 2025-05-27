@@ -2,6 +2,8 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: passenger
+  labels:
+    app: passenger
 spec:
   replicas: 1
   selector:
@@ -14,23 +16,37 @@ spec:
     spec:
       containers:
         - name: passenger
-          image: localhost:32000/passenger:latest # Make sure this image name is correct
+          image: localhost:32000/passenger:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 8080
-          envFrom: # Use ConfigMap for RabbitMQ credentials
+          envFrom:
             - configMapRef:
-                name: rabbit-mq-configmap
+                name: rabbit-mq-configmap # Provides RABBITMQ_HOST, RABBITMQ_PORT
+          env:
+            - name: RABBITMQ_USER
+              valueFrom:
+                secretKeyRef:
+                  name: rabbitmq-default-user # Name of the Secret for RabbitMQ username
+                  key: username              # Key in the Secret for the username
+            - name: RABBITMQ_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: rabbitmq-default-user # Name of the Secret for RabbitMQ password
+                  key: password              # Key in the Secret for the password
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: passenger-service
+  labels:
+    app: passenger
 spec:
   selector:
     app: passenger
   ports:
-    - protocol: TCP
+    - name: http
+      protocol: TCP
       port: 8080
       targetPort: 8080
   type: ClusterIP

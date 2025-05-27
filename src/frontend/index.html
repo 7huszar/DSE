@@ -309,12 +309,12 @@
 
                     this.ws.on('connect', () => {
                         this.connected = true;
-                        this.addEvent('Socket.IO: Connected to backend'); // Angepasste Meldung
+                        console.log('Socket.IO: Successfully connected to backend.'); // Angepasste Meldung
                     });
 
                     this.ws.on('disconnect', (reason) => {
                         this.connected = false;
-                        this.addEvent(`Socket.IO: Disconnected from backend (${reason})`);
+                        console.log(`Socket.IO: Disconnected from backend (${reason})`);
                         // Socket.IO hat eingebaute Wiederverbindungslogik.
                         // Ein manueller setTimeout ist oft nicht mehr nötig.
                     });
