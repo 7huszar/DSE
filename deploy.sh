@@ -45,6 +45,20 @@ microk8s kubectl apply -f ./src/vehicle/data_mock/deployment.yaml
 microk8s kubectl apply -f ./src/passenger/deployment.yaml
 microk8s kubectl apply -f ./src/frontend/deployment.yaml
 
+echo "postgres db files"
+
+microk8s kubectl apply -f ./src/backend/db/central_director_db/cd-postgres-configmap.yaml
+microk8s kubectl apply -f ./src/backend/db/central_director_db/cd-postgres-pv-claim.yaml
+microk8s kubectl apply -f ./src/backend/db/central_director_db/cd-psql-persistant-volume.yaml.yaml
+microk8s kubectl apply -f ./src/backend/db/central_director_db/cd-ps-deployment.yaml
+microk8s kubectl apply -f ./src/backend/db/central_director_db/cd-ps-service.yaml.yaml
+
+microk8s kubectl apply -f ./src/backend/db/location_tracker_db/lt-postgres-configmap.yaml
+microk8s kubectl apply -f ./src/backend/db/location_tracker_db/lt-postgres-pv-claim.yaml
+microk8s kubectl apply -f ./src/backend/db/location_tracker_db/lt-psql-persistant-volume.yaml.yaml
+microk8s kubectl apply -f ./src/backend/db/location_tracker_db/lt-ps-deployment.yaml
+microk8s kubectl apply -f ./src/backend/db/location_tracker_db/lt-ps-service.yaml.yaml
+
 echo "apply configmaps"
 microk8s kubectl apply -f ./src/backend/rabbit_mq/rabbitmq-configmap.yaml
 microk8s kubectl apply -f ./src/backend/location_tracker/location-tracker-configmap.yaml
@@ -60,3 +74,5 @@ microk8s kubectl rollout restart deployment/location-sender
 microk8s kubectl rollout restart deployment/data-mock
 microk8s kubectl rollout restart deployment/passenger
 microk8s kubectl rollout restart deployment/visor
+microk8s kubectl rollout restart deployment/lt-postgres
+microk8s kubectl rollout restart deployment/cd-postgres
