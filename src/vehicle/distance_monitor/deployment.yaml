@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: location-sender-${VIN_LOWER}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: location-sender
+  template:
+    metadata:
+      labels:
+        app: location-sender
+    spec:
+      containers:
+        - name: location-sender
+          image: localhost:32000/location-sender:latest
+          ports:
+            - containerPort: 5000
+          envFrom:
+            - configMapRef:
+                name: rabbit-mq-configmap
+            - configMapRef:
+                name: location-tracker-configmap
+          env:
+            - name: RABBITMQ_USER
+              valueFrom:
+                secretKeyRef:
+                  name: rabbitmq-default-user
+                  key: username
+            - name: RABBITMQ_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: rabbitmq-default-user
+                  key: password
