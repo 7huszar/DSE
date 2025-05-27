@@ -4,11 +4,23 @@ import logging
 
 from vehicle_module import Vehicle
 import requests
+import random
+import numpy as np
 
 ### CONSTANTS START ###
 
 BASE_URI = "http://location-sender-{}/data"
 VINS = ["4A3AK24FX6E028812", "1N6SD16S8NC343640"]
+
+MAX_DISTANCE_FRONT = 50 #in m
+MIN_DISTANCE_FRONT = 0.5
+
+MAX_DISTANCE_BACK = 50
+MIN_DISTANCE_BACK = 0.5
+
+last_distance_back = 0
+last_distance_front = 0
+
 ### CONSTANTS END ###
 
 logging.basicConfig(
@@ -25,12 +37,19 @@ def update_car(vehicle):
 
     new_coord = vehicle.sample(48.192701205090565, 16.37814270634505)
 
+
+    distance_front = random.sample(np.arange(MIN_DISTANCE_FRONT, MAX_DISTANCE_FRONT, 0.1),1)
+    distance_back = random.sample(np.arange(MIN_DISTANCE_BACK, MAX_DISTANCE_BACK, 0.1),1)
+
     data = {
             "vin": vehicle.vin,
             "lat": new_coord[0],
             "long": new_coord[1],
-            "time": new_coord[2]
+            "time": new_coord[2],
+            "distance_front": distance_front,
+            "distance_back": distance_back
     }
+
     logger.info(f"Send data to {vehicle.vin} with body:{str(data)}")
 
     try:

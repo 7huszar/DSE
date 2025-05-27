@@ -49,15 +49,15 @@ echo "postgres db files"
 
 microk8s kubectl apply -f ./src/backend/db/central_director_db/cd-postgres-configmap.yaml
 microk8s kubectl apply -f ./src/backend/db/central_director_db/cd-postgres-pv-claim.yaml
-microk8s kubectl apply -f ./src/backend/db/central_director_db/cd-psql-persistant-volume.yaml.yaml
+microk8s kubectl apply -f ./src/backend/db/central_director_db/cd-psql-persistant-volume.yaml
 microk8s kubectl apply -f ./src/backend/db/central_director_db/cd-ps-deployment.yaml
-microk8s kubectl apply -f ./src/backend/db/central_director_db/cd-ps-service.yaml.yaml
+microk8s kubectl apply -f ./src/backend/db/central_director_db/cd-ps-service.yaml
 
 microk8s kubectl apply -f ./src/backend/db/location_tracker_db/lt-postgres-configmap.yaml
 microk8s kubectl apply -f ./src/backend/db/location_tracker_db/lt-postgres-pv-claim.yaml
-microk8s kubectl apply -f ./src/backend/db/location_tracker_db/lt-psql-persistant-volume.yaml.yaml
+microk8s kubectl apply -f ./src/backend/db/location_tracker_db/lt-psql-persistant-volume.yaml
 microk8s kubectl apply -f ./src/backend/db/location_tracker_db/lt-ps-deployment.yaml
-microk8s kubectl apply -f ./src/backend/db/location_tracker_db/lt-ps-service.yaml.yaml
+microk8s kubectl apply -f ./src/backend/db/location_tracker_db/lt-ps-service.yaml
 
 echo "apply configmaps"
 microk8s kubectl apply -f ./src/backend/rabbit_mq/rabbitmq-configmap.yaml
