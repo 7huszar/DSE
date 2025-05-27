@@ -3,13 +3,14 @@ import math
 import time
 
 class Vehicle:
-    def __init__(self, longitude, latitude, velocity=0.0, acceleration=0.0, direction=[1.0, 0.0]):
+    def __init__(self, vin, longitude, latitude, velocity=0.0, acceleration=0.0, direction=[1.0, 0.0]):
         self.longitude = longitude
         self.latitude = latitude
         self.velocity = velocity
         self.acceleration = acceleration
         self.direction = direction
         self.internal_time = time.time()
+        self.vin = vin
 
     earth_radius = 6371000
 
