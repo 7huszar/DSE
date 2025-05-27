@@ -21,26 +21,25 @@ vehicle = Vehicle(velocity=1.0, longitude=48.192701205090565, latitude=16.378142
 
 def update_car():
     global vehicle
-    while True:
-        new_coord = vehicle.sample(48.192701205090565, 16.37814270634505)
+    new_coord = vehicle.sample(48.192701205090565, 16.37814270634505)
 
-        data = {
+    data = {
             "vin": "JMZBLA4G601934983",
             "lat": new_coord[0],
             "long": new_coord[1],
             "time": new_coord[2]
-        }
-        logger.info(f"Send data to {RECEIVER} with body:{str(data)}")
+    }
+    logger.info(f"Send data to {RECEIVER} with body:{str(data)}")
 
-        try:
-            response = requests.post(RECEIVER, json=data, timeout=5)
+    try:
+        response = requests.post(RECEIVER, json=data, timeout=5)
 
-            if response.ok:
-                logger.info(f"Successful post request to {RECEIVER}. \nResponse status: {response.status_code}\n Response body: {response.text}")
-            else:
-                logger.warning(f"Failed post request to {RECEIVER}. \nResponse status: {response.status_code}\n Response body: {response.text}")
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Request for {RECEIVER} failed:\n{repr(e)}")
+        if response.ok:
+            logger.info(f"Successful post request to {RECEIVER}. \nResponse status: {response.status_code}\n Response body: {response.text}")
+        else:
+            logger.warning(f"Failed post request to {RECEIVER}. \nResponse status: {response.status_code}\n Response body: {response.text}")
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Request for {RECEIVER} failed:\n{repr(e)}")
 
 while True:
     update_car()

@@ -5,74 +5,98 @@ import pika
 import json
 import threading
 import os
+import time
+
+RABBITMQ_HOST = os.environ.get('RABBITMQ_HOST', 'rabbitmq')
+RABBITMQ_PORT = int(os.environ.get('RABBITMQ_PORT', 5672))
+RABBITMQ_USER = os.environ.get('RABBITMQ_USER')
+RABBITMQ_PASSWORD = os.environ.get('RABBITMQ_PASSWORD')
+
+EXCHANGE_NAME = 'broker'
+EXCHANGE_TYPE = 'topic'
+ROUTING_KEY_FOR_PASSENGER = 'backend.location.passenger'
+PASSENGER_VISOR_QUEUE_NAME = 'passenger_service_visor_updates_queue'
 
 app = Flask(__name__)
 CORS(app)
 socketio = SocketIO(app, cors_allowed_origins="*")
 
-# RabbitMQ connection
-credentials = pika.PlainCredentials(
-    username=os.environ.get('RABBITMQ_USER', 'guest'),
-    password=os.environ.get('RABBITMQ_PASSWORD', 'guest')
-)
+vehicles_data_cache = {}
 
-vehicles = {}  # Store vehicle data in memory
-
-def connect_rabbitmq():
-    try:
-        connection = pika.BlockingConnection(
-            pika.ConnectionParameters(
-                host='rabbitmq',
-                port=int(os.environ.get('RABBITMQ_PORT', 5672)),
-                credentials=credentials
+def rabbitmq_consumer_main_loop():
+    while True:
+        if not RABBITMQ_USER or not RABBITMQ_PASSWORD:
+            print("[Passenger-RabbitMQ] CRITICAL: RABBITMQ_USER or RABBITMQ_PASSWORD not set from environment. Retrying in 10s.")
+            time.sleep(10)
+            continue
+        try:
+            print(f"[Passenger-RabbitMQ] Connecting to RabbitMQ: {RABBITMQ_HOST}:{RABBITMQ_PORT} User: {RABBITMQ_USER}")
+            credentials = pika.PlainCredentials(RABBITMQ_USER, RABBITMQ_PASSWORD)
+            connection_params = pika.ConnectionParameters(
+                host=RABBITMQ_HOST, port=RABBITMQ_PORT, credentials=credentials,
+                heartbeat=600, blocked_connection_timeout=300
             )
-        )
-        channel = connection.channel()
-        channel.exchange_declare(exchange='broker', exchange_type='topic')
+            connection = pika.BlockingConnection(connection_params)
+            channel = connection.channel()
+            print("[Passenger-RabbitMQ] Connected to RabbitMQ.")
 
-        # Subscribe to location updates
-        result = channel.queue_declare('', exclusive=True)
-        queue_name = result.method.queue
-        channel.queue_bind(exchange='broker', queue=queue_name, routing_key='backend.location.#')
+            channel.exchange_declare(exchange=EXCHANGE_NAME, exchange_type=EXCHANGE_TYPE, durable=True)
+            channel.queue_declare(queue=PASSENGER_VISOR_QUEUE_NAME, durable=True)
+            channel.queue_bind(exchange=EXCHANGE_NAME, queue=PASSENGER_VISOR_QUEUE_NAME, routing_key=ROUTING_KEY_FOR_PASSENGER)
+            print(f"[Passenger-RabbitMQ] Queue '{PASSENGER_VISOR_QUEUE_NAME}' bound to RKey '{ROUTING_KEY_FOR_PASSENGER}'.")
 
-        def callback(ch, method, properties, body):
-            data = json.loads(body)
-            update_vehicle_data(data)
+            def message_processing_callback(ch, method, properties, body):
+                msg_str = body.decode()
+                print(f"[Passenger-RabbitMQ] Received (Tag:{method.delivery_tag}, RKey:{method.routing_key}): {msg_str[:100]}...") # Log only first 100 chars
+                try:
+                    data = json.loads(msg_str)
+                    vin = data.get('vin')
+                    if vin:
+                        vehicles_data_cache[vin] = data
+                        socketio.emit('vehicle_update', data) # Emit full data object
+                        # print(f"[Passenger-SocketIO] Emitted 'vehicle_update' for VIN {vin}.") # Can be verbose
+                    ch.basic_ack(delivery_tag=method.delivery_tag)
+                except Exception as e:
+                    print(f"[Passenger-RabbitMQ] Error processing message (Tag:{method.delivery_tag}): {e}. NACKing.")
+                    ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
 
-        channel.basic_consume(queue=queue_name, on_message_callback=callback, auto_ack=True)
-        print("Connected to RabbitMQ, listening for vehicle updates...")
-        channel.start_consuming()
-    except Exception as e:
-        print(f"RabbitMQ connection error: {e}")
-        # Retry connection after 5 seconds
-        threading.Timer(5.0, connect_rabbitmq).start()
+            channel.basic_consume(queue=PASSENGER_VISOR_QUEUE_NAME, on_message_callback=message_processing_callback, auto_ack=False)
+            print(f"[Passenger-RabbitMQ] Waiting for messages in Queue '{PASSENGER_VISOR_QUEUE_NAME}'.")
+            channel.start_consuming()
 
-def update_vehicle_data(data):
-    vin = data.get('vin')
-    if vin:
-        vehicles[vin] = data
-        # Emit update to connected clients
-        socketio.emit('vehicle_update', {'type': 'vehicle_update', 'vehicle': data})
+        except pika.exceptions.AMQPConnectionError as e:
+            print(f"[Passenger-RabbitMQ] AMQP Connection Error: {e}")
+        except Exception as e:
+            print(f"[Passenger-RabbitMQ] Unexpected error in consumer loop: {e}")
+
+        print("[Passenger-RabbitMQ] Connection lost or error. Retrying in 10 seconds...")
+        time.sleep(10)
 
 @app.route('/vehicles', methods=['GET'])
-def get_vehicles():
-    return jsonify(list(vehicles.values()))
+def get_all_vehicles_api():
+    return jsonify(list(vehicles_data_cache.values()))
 
-@app.route('/vehicle/<vin>', methods=['GET'])
-def get_vehicle(vin):
-    vehicle = vehicles.get(vin)
+@app.route('/vehicle/<string:vin>', methods=['GET'])
+def get_specific_vehicle_api(vin):
+    vehicle = vehicles_data_cache.get(vin)
     if vehicle:
         return jsonify(vehicle)
-    return jsonify({'error': 'Vehicle not found'}), 404
+    return jsonify({"error": f"Vehicle VIN {vin} not found"}), 404
 
 @socketio.on('connect')
-def handle_connect():
-    emit('connected', {'data': 'Connected to STEEER backend'})
+def handle_socketio_client_connect():
+    print(f"[Passenger-SocketIO] Client connected (SID: {request.sid})")
+    emit('connected', {'message': 'Connected to STEEER Visor Backend (Passenger)!'}, room=request.sid)
+
+@socketio.on('disconnect')
+def handle_socketio_client_disconnect():
+    print(f"[Passenger-SocketIO] Client disconnected (SID: {request.sid})")
 
 if __name__ == '__main__':
-    # Start RabbitMQ consumer in background thread
-    rabbitmq_thread = threading.Thread(target=connect_rabbitmq)
-    rabbitmq_thread.daemon = True
-    rabbitmq_thread.start()
-
-    socketio.run(app, host='0.0.0.0', port=8080, allow_unsafe_werkzeug=True)
+    print("[Passenger] Initializing Passenger Service...")
+    consumer_thread = threading.Thread(target=rabbitmq_consumer_main_loop, name="RabbitMQConsumerThread")
+    consumer_thread.daemon = True
+    consumer_thread.start()
+    print("[Passenger] RabbitMQ Consumer Thread started.")
+    print(f"[Passenger] Starting Flask-SocketIO server on http://0.0.0.0:8080 ...")
+    socketio.run(app, host='0.0.0.0', port=8080, allow_unsafe_werkzeug=True, debug=False)

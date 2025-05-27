@@ -14,17 +14,13 @@ spec:
     spec:
       containers:
         - name: passenger
-          image: localhost:32000/passenger:latest
+          image: localhost:32000/passenger:latest # Make sure this image name is correct
           imagePullPolicy: Always
           ports:
             - containerPort: 8080
-          env:
-            - name: RABBITMQ_USER
-              value: "dse"
-            - name: RABBITMQ_PASSWORD
-              value: "dse123"
-            - name: RABBITMQ_PORT
-              value: "5672"
+          envFrom: # Use ConfigMap for RabbitMQ credentials
+            - configMapRef:
+                name: rabbit-mq-configmap
 ---
 apiVersion: v1
 kind: Service

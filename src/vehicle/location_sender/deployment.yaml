@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: location-sender-${VIN}
+  name: location-sender-${VIN_LOWER}
 spec:
   replicas: 1
   selector:
