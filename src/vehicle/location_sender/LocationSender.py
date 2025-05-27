@@ -69,7 +69,7 @@ def receive_data():
 
     channel.basic_publish(
         exchange='broker',
-        routing_key='backend.locat  ion.passenger',
+        routing_key='backend.location.passenger',
         body=json.dumps(data).encode("utf-8")
     )
 
