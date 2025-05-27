@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 
 vehicles = []
 for vin in VINS:
-    vehicles.append(Vehicle(vin, velocity=1.0, longitude=48.192701205090565, latitude=16.37814270634505, direction=[0.0, 1.0]))
+    vehicles.append(Vehicle(vin, velocity=1.0, longitude=16.37814270634505, latitude= 48.192701205090565, direction=[0.0, 1.0]))
 
 def update_car(vehicle):
 
@@ -72,10 +72,12 @@ def update_car(vehicle):
             "distance_back": distance_back
     }
 
-    logger.info(f"Send data to {vehicle.vin} with body:{str(data)}")
+
+    addr = BASE_URI.format(vehicle.vin.lower())
+    logger.info(f"Send data to {addr} with body:{str(data)}")
 
     try:
-        response = requests.post(BASE_URI.format(vehicle.vin.lower()), json=data, timeout=5)
+        response = requests.post(addr, json=data, timeout=5)
 
         if response.ok:
             logger.info(f"Successful post request to {vehicle.vin}. \nResponse status: {response.status_code}\n Response body: {response.text}")

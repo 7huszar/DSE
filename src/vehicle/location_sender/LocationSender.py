@@ -1,3 +1,5 @@
+import time
+
 import pika
 import os
 import json
@@ -46,10 +48,13 @@ while not_succeeded:
     except AMQPConnectionError as e:
         logger.warning(f"Failed to establish connection due to error: {repr(e)}.\n Retrying in {RETRY_WAIT} seconds.")
 
+    if not_succeeded:
+        time.sleep(RETRY_WAIT)
+
 logger.info("Successfully established connection to rabbitmq.")
 
 channel = connection.channel()
-channel.exchange_declare(exchange='broker', exchange_type='topic')
+channel.exchange_declare(exchange='broker', exchange_type='topic', durable=True)
 
 if channel.is_closed:
     logger.error("channel closed")
@@ -80,7 +85,5 @@ def health_check():
     return jsonify({"status": "healthy"}), 200
 
 if __name__ == '__main__':
-    # Start location sender in background
-
     # Start Flask app
     app.run(host='0.0.0.0', port=5000)

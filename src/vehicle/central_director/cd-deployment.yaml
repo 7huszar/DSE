@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: central-director
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: central-director
+  template:
+    metadata:
+      labels:
+        app: central-director
+    spec:
+      containers:
+        - name: central-director
+          image: localhost:32000/central-director:latest
+          ports:
+            - containerPort: 5000
+          env:
+            - name: RABBITMQ_USER
+              valueFrom:
+                secretKeyRef:
+                  name: rabbitmq-default-user
+                  key: username
+            - name: RABBITMQ_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: rabbitmq-default-user
+                  key: password
+            - name: CD_DB_HOST
+              value: "cd-postgres"
+            - name: CD_DB_PORT
+              value: "5432"
+            - name: CD_DB_NAME
+              value: "cd_db"
+            - name: CD_DB_USER
+              value: "admin"
+            - name: CD_DB_PASSWORD
+              value: "admin"

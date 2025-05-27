@@ -262,6 +262,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/vue@2.6.14/dist/vue.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<!-- Socket.IO client library is already included in <head> -->
 <script>
     new Vue({
         el: '#app',
@@ -272,7 +273,7 @@
             map: null,
             markers: {},
             ws: null,
-            apiUrl: '/api' // Will use nginx proxy
+            apiUrl: '/api'
         },
         mounted() {
             this.initializeMap();
@@ -281,65 +282,47 @@
         },
         methods: {
             initializeMap() {
-                // Initialize the map centered on Vienna
-                this.map = L.map('map').setView([48.2082, 16.3738], 13);
-
+                this.map = L.map('map').setView([48.2082, 16.3738], 13); // Centered on Vienna
                 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                     attribution: '© OpenStreetMap contributors'
                 }).addTo(this.map);
             },
 
-            // Innerhalb von new Vue({ ... methods: { HIER } ... })
-
             connectToBackend() {
                 try {
-                    // NEUE METHODE mit Socket.IO Client:
-                    // Dein Nginx (frontend/nginx.conf) ist so konfiguriert:
-                    // location /ws { proxy_pass http://passenger-service:8080/socket.io/; }
-                    //
-                    // Der Socket.IO-Client verbindet sich. Der 'path' Parameter sagt dem Client,
-                    // unter welchem Pfad auf dem Frontend-Server die Socket.IO-Kommunikation beginnt.
-                    // Nginx fängt Anfragen an diesen Pfad ab und leitet sie an den '/socket.io/'
-                    // Endpunkt des Backends weiter.
-                    this.ws = io(window.location.origin, { // Verbinde mit dem aktuellen Host und Port
-                        path: "/ws"  // Der Basispfad, den Nginx für Socket.IO-Anfragen matched.
-                                     // Socket.IO Client wird Anfragen wie /ws/?EIO=4... senden.
-                                     // Nginx leitet alles unter /ws an /socket.io/ im Backend weiter.
+                    // Connects to the Socket.IO server.
+                    // Nginx proxies requests from /ws to /socket.io/ on the backend.
+                    this.ws = io(window.location.origin, {
+                        path: "/ws"
                     });
 
                     this.ws.on('connect', () => {
                         this.connected = true;
-                        console.log('Socket.IO: Successfully connected to backend.'); // Angepasste Meldung
+                        console.log('Socket.IO: Client successfully connected to backend.');
+                        // this.addEvent('Socket.IO: Connected to backend'); // Optional: for user-facing event log
                     });
 
                     this.ws.on('disconnect', (reason) => {
                         this.connected = false;
                         console.log(`Socket.IO: Disconnected from backend (${reason})`);
-                        // Socket.IO hat eingebaute Wiederverbindungslogik.
-                        // Ein manueller setTimeout ist oft nicht mehr nötig.
+                        this.addEvent(`Socket.IO: Disconnected (${reason})`); // Optional: for user-facing event log
                     });
 
                     this.ws.on('connect_error', (error) => {
                         console.error('Socket.IO connection error:', error);
                         this.connected = false;
-                        this.addEvent('Socket.IO: Connection error');
+                        this.addEvent('Socket.IO: Connection error'); // Keep this for user log
                     });
 
-                    // Dein Backend (passenger.py) sendet ein Event namens 'vehicle_update'.
-                    // Du musst hier auf genau diesen Event-Namen lauschen.
-                    this.ws.on('vehicle_update', (dataFromServer) => {
-                        // dataFromServer ist bereits das vom Server gesendete Objekt,
-                        // kein JSON-String mehr, der geparst werden muss.
-                        this.handleRealtimeUpdate(dataFromServer);
+                    // Listens for 'vehicle_update' events from the server
+                    this.ws.on('vehicle_update', (vehicleDataFromServer) => {
+                        console.log('Socket.IO: Received vehicle_update:', vehicleDataFromServer);
+                        this.handleRealtimeUpdate(vehicleDataFromServer);
                     });
 
-                    // Wenn dein Backend beim Verbindungsaufbau ein 'connected'-Event sendet
-                    // (wie in deinem passenger.py @socketio.on('connect') def handle_connect(): emit('connected', ...)),
-                    // dann lausche auch darauf:
+                    // Handles the 'connected' event emitted by the passenger service on successful client connection
                     this.ws.on('connected', (serverAckData) => {
-                        console.log('Server acknowledgement/event "connected":', serverAckData);
-                        // Hier kannst du auf die Bestätigung vom Server reagieren, falls nötig.
-                        // Zum Beispiel die `this.connected` Flag setzen, falls nicht schon durch den 'connect' Event geschehen.
+                        console.log('Socket.IO: Server sent "connected" event:', serverAckData);
                     });
 
                 } catch (error) {
@@ -349,50 +332,64 @@
             },
 
             startPolling() {
-                // Poll for updates every 2 seconds as fallback
-                this.fetchVehicleData();
+                this.fetchVehicleData(); // Initial fetch
                 setInterval(() => {
                     this.fetchVehicleData();
-                }, 2000);
+                }, 2000); // Poll every 2 seconds
             },
 
             async fetchVehicleData() {
                 try {
                     const response = await fetch(this.apiUrl + '/vehicles');
                     if (response.ok) {
-                        const data = await response.json();
-                        this.updateVehicles(data);
-                        if (!this.connected) {
-                            this.connected = true;
-                        }
+                        const rawVehicles = await response.json();
+                        console.log('Fetched vehicles via HTTP /vehicles:', rawVehicles);
+                        const processedVehicles = rawVehicles.map(v => this.normalizeVehicleData(v));
+                        this.updateVehicles(processedVehicles);
+                    } else {
+                        console.error('Failed to fetch vehicle data, status:', response.status);
                     }
                 } catch (error) {
-                    console.error('Failed to fetch vehicle data:', error);
-                    this.connected = false;
+                    console.error('Error fetching vehicle data:', error);
                 }
             },
 
-            handleRealtimeUpdate(data) {
-                if (data.type === 'vehicle_update') {
-                    this.updateVehicle(data.vehicle);
-                } else if (data.type === 'emergency_brake') {
-                    this.handleEmergencyBrake(data);
-                } else if (data.type === 'event') {
-                    this.addEvent(data.message);
+            // Helper function to ensure consistent vehicle data structure
+            normalizeVehicleData(vehicleData) {
+                const normalized = { ...vehicleData };
+                if (typeof vehicleData.lat !== 'undefined' && typeof vehicleData.long !== 'undefined') {
+                    normalized.location = {
+                        lat: vehicleData.lat,
+                        lng: vehicleData.long // 'long' from sender becomes 'lng' for Leaflet
+                    };
+                } else if (!vehicleData.location) { // If location object itself is missing
+                    normalized.location = { lat: 0, lng: 0 };
+                    console.warn("Vehicle data missing location information:", vehicleData);
                 }
+                // Ensure speed is present, default to 0 if not
+                if (typeof normalized.speed === 'undefined') {
+                    normalized.speed = 0;
+                }
+                return normalized;
             },
 
-            updateVehicles(vehicles) {
-                this.vehicles = vehicles;
-                vehicles.forEach(vehicle => {
+            handleRealtimeUpdate(vehicleDataFromServer) {
+                console.log('Handling real-time update for:', vehicleDataFromServer);
+                const processedVehicle = this.normalizeVehicleData(vehicleDataFromServer);
+                this.updateVehicle(processedVehicle);
+            },
+
+            updateVehicles(vehicles) { // vehicles is an array of normalized vehicle objects
+                this.vehicles = vehicles; // Vue will react to this change
+                this.vehicles.forEach(vehicle => {
                     this.updateVehicleMarker(vehicle);
                 });
             },
 
-            updateVehicle(vehicle) {
+            updateVehicle(vehicle) { // vehicle is a single normalized vehicle object
                 const index = this.vehicles.findIndex(v => v.vin === vehicle.vin);
                 if (index >= 0) {
-                    Vue.set(this.vehicles, index, vehicle);
+                    this.vehicles.splice(index, 1, vehicle); // Replace item for reactivity
                 } else {
                     this.vehicles.push(vehicle);
                 }
@@ -400,66 +397,65 @@
             },
 
             updateVehicleMarker(vehicle) {
+                if (!vehicle.location || typeof vehicle.location.lat === 'undefined' || typeof vehicle.location.lng === 'undefined') {
+                    console.error('Cannot update marker, vehicle location data is invalid:', vehicle);
+                    return;
+                }
+
                 const { lat, lng } = vehicle.location;
 
                 if (this.markers[vehicle.vin]) {
-                    // Update existing marker
                     this.markers[vehicle.vin].setLatLng([lat, lng]);
                 } else {
-                    // Create new marker
                     const icon = L.divIcon({
-                        className: 'vehicle-marker-wrapper',
-                        html: `<div class="vehicle-marker">${vehicle.vin.slice(-6)}</div>`,
+                        className: 'vehicle-marker-wrapper', // This class is for potential wrapper styling, not the marker itself
+                        html: `<div class="vehicle-marker">${vehicle.vin ? vehicle.vin.slice(-6) : 'N/A'}</div>`,
                         iconSize: [80, 30],
                         iconAnchor: [40, 15]
                     });
-
                     const marker = L.marker([lat, lng], { icon })
                         .addTo(this.map)
                         .bindPopup(`
-                                <strong>${vehicle.vin}</strong><br>
-                                Speed: ${vehicle.speed} km/h<br>
-                                Emergency Brake: ${vehicle.emergencyBrake ? 'ACTIVE' : 'Inactive'}
-                            `);
-
+                            <strong>VIN: ${vehicle.vin || 'N/A'}</strong><br>
+                            Speed: ${typeof vehicle.speed !== 'undefined' ? vehicle.speed : '-'} km/h<br>
+                            Location: ${lat.toFixed(5)}, ${lng.toFixed(5)}<br>
+                            Emergency Brake: ${vehicle.emergencyBrake ? 'ACTIVE' : 'Inactive'}
+                        `);
                     this.markers[vehicle.vin] = marker;
                 }
 
-                // Update marker color based on emergency brake status
-                if (vehicle.emergencyBrake) {
-                    const markerElement = this.markers[vehicle.vin].getElement();
-                    if (markerElement) {
+                const markerElement = this.markers[vehicle.vin] ? this.markers[vehicle.vin].getElement() : null;
+                if (markerElement && markerElement.querySelector('.vehicle-marker')) {
+                    if (vehicle.emergencyBrake) {
                         markerElement.querySelector('.vehicle-marker').style.background = '#dc3545';
+                    } else {
+                        markerElement.querySelector('.vehicle-marker').style.background = '#1e3c72'; // Default color
                     }
                 }
             },
 
-            handleEmergencyBrake(data) {
+            handleEmergencyBrake(data) { // This would be triggered by a specific 'emergency_brake' event
                 this.addEvent(`EMERGENCY BRAKE activated for ${data.vin}`);
                 const vehicle = this.vehicles.find(v => v.vin === data.vin);
                 if (vehicle) {
-                    vehicle.emergencyBrake = true;
-                    vehicle.speed = 0;
+                    Vue.set(vehicle, 'emergencyBrake', true);
+                    Vue.set(vehicle, 'speed', 0);
+                    this.updateVehicleMarker(vehicle);
                 }
             },
 
             addEvent(message) {
-                const timestamp = new Date().toLocaleTimeString('de-AT', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    second: '2-digit'
+                const timestamp = new Date().toLocaleTimeString('en-US', {
+                    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
                 });
-
                 this.eventLog.unshift({ timestamp, message });
-
-                // Keep only last 100 events
                 if (this.eventLog.length > 100) {
-                    this.eventLog = this.eventLog.slice(0, 100);
+                    this.eventLog.pop(); // Remove oldest event
                 }
             },
 
-            formatLocation(location) {
-                if (!location || !location.lat || !location.lng) {
+            formatLocation(location) { // location is vehicle.location
+                if (!location || typeof location.lat === 'undefined' || typeof location.lng === 'undefined') {
                     return '-';
                 }
                 return `${location.lat.toFixed(5)}, ${location.lng.toFixed(5)}`;

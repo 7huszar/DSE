@@ -2,7 +2,7 @@ echo "apply plugins"
 microk8s kubectl apply -f "https://github.com/rabbitmq/cluster-operator/releases/latest/download/cluster-operator.yml"
 
 microk8s kubectl apply -f ./src/backend/rabbit_mq/rabbit_mq.yaml
-microk8s kubectl apply -f ./src/backend/rabbitmq-configmap.yaml
+microk8s kubectl apply -f ./src/backend/rabbit_mq/rabbitmq-configmap.yaml
 
 echo "build docker images"
 docker build -t localhost:32000/location-tracker:latest ./src/backend/location_tracker/
@@ -19,12 +19,13 @@ docker push localhost:32000/passenger:latest
 docker push localhost:32000/visor:latest
 
 
-while IFS= read -r VIN; do
+jq -c '.[]' vehicles.json | while read -r record; do
 
+  VIN=$(echo "$record" | jq -r '.vin')
   VIN_LOWER=${VIN,,}
   export VIN_LOWER
 
-    echo "deploy services for vehicle with vin: $VIN as location_sender-$VIN_LOWER"
+  echo "deploy services for vehicle with vin: $VIN as location_sender-$VIN_LOWER"
 
 
   envsubst < ./src/vehicle/location_sender/deployment.yaml | microk8s kubectl apply -f -
@@ -34,9 +35,9 @@ while IFS= read -r VIN; do
   microk8s kubectl rollout restart deployment/location-sender-"$VIN_LOWER"
 
 
-done < TestData.txt
+done
 
-microk8s kubectl create configmap vin-config --from-file=TestData.txt=TestData.txt
+microk8s kubectl create configmap vehicle-data --from-file=vehicles.json=./vehicles.json
 
 echo "apply deployment files"
 microk8s kubectl apply -f ./src/backend/location_tracker/deployment.yaml
@@ -70,7 +71,6 @@ microk8s kubectl apply -f ./src/vehicle/data_mock/service.yaml
 
 echo "restart self made application"
 microk8s kubectl rollout restart deployment/location-tracker
-microk8s kubectl rollout restart deployment/location-sender
 microk8s kubectl rollout restart deployment/data-mock
 microk8s kubectl rollout restart deployment/passenger
 microk8s kubectl rollout restart deployment/visor

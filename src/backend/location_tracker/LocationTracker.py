@@ -1,4 +1,6 @@
 import threading
+import time
+
 import pika
 import json
 import os
@@ -6,14 +8,29 @@ from flask import Flask
 import psycopg2 as psy
 import logging
 
+### CONSTANTS START ###
+
+RETRY_WAIT = 5
+
+### CONSTANTS END ###
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
 )
 logger = logging.getLogger(__name__)
 
+conn = None
 
-conn = psy.connect(host=os.environ["LT_POSTGRES_HOST"], database="lt_db", user=os.environ["LT_POSTGRES_USER"], password=os.environ["LT_POSTGRES_PASSWORD"])
+not_succeeded = True
+while not_succeeded:
+    try:
+        conn = psy.connect(host=os.environ["LT_POSTGRES_HOST"], database="lt_db", user=os.environ["LT_POSTGRES_USER"], password=os.environ["LT_POSTGRES_PASSWORD"])
+        not_succeeded = False
+    except psy.OperationalError as e:
+        logger.warning(f"Failed to connect to postgres: {repr(e)}")
+    if not_succeeded:
+        time.sleep(5)
 
 
 
