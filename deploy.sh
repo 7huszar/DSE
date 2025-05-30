@@ -1,3 +1,7 @@
+echo "make sure plugins are enabled"
+microk8s enable helm3
+microk8s enable dashboard-proxy
+
 echo "apply plugins"
 microk8s kubectl apply -f "https://github.com/rabbitmq/cluster-operator/releases/latest/download/cluster-operator.yml"
 
