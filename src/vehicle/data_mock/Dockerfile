@@ -6,8 +6,8 @@ WORKDIR /DataMock
 
 # Copy the application code
 COPY DataMock.py /DataMock
-COPY vehicle_module.py /DataMock
-COPY ../../
+COPY vehicle.py /DataMock
+COPY vehicles.json /DataMock
 
 # Install dependencies
 RUN pip install flask requests

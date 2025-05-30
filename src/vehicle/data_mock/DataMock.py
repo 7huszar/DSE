@@ -1,16 +1,20 @@
+import json
 import time
 
 import logging
 
-from vehicle_module import Vehicle
+from vehicle import Vehicle
 import requests
 import random
 import numpy as np
 
+vehicle_config = None
+with open("vehicles.json", "r") as f:
+    vehicle_config = json.load(f)
+
 ### CONSTANTS START ###
 
 BASE_URI = "http://location-sender-{}/data"
-VINS = ["4A3AK24FX6E028812", "1N6SD16S8NC343640"]
 
 MAX_DISTANCE_FRONT = 50 #in m
 MIN_DISTANCE_FRONT = 0.5
@@ -32,30 +36,30 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 vehicles = []
-for vin in VINS:
-    vehicles.append(Vehicle(vin, velocity=1.0, longitude=16.37814270634505, latitude= 48.192701205090565, direction=[0.0, 1.0]))
+for vehicle in vehicle_config:
+    vehicles.append(Vehicle(vehicle["vin"], velocity=vehicle["vel"], longitude=vehicle["lon"], latitude=vehicle["lat"], direction=vehicle["dir"]))
 
 def update_car(vehicle):
 
     global last_distance_front
     global last_distance_back
 
-    new_coord = vehicle.sample(48.192701205090565, 16.37814270634505)
+    new_coord = vehicle.sample(0, 0)
 
-    if(last_distance_front == 0):
+    if last_distance_front == 0:
         distance_front = random.choice(np.arange(MIN_DISTANCE_FRONT, MAX_DISTANCE_FRONT, 0.1))
     else:
         distance_front = 0
-        while(distance_front < MIN_DISTANCE_FRONT or distance_front > MAX_DISTANCE_FRONT):
+        while distance_front < MIN_DISTANCE_FRONT or distance_front > MAX_DISTANCE_FRONT:
             distance_front = random.choice(np.arange((1-MAX_CHANGE_RATE_PERCENT)*last_distance_front,(1+MAX_CHANGE_RATE_PERCENT)*last_distance_front, 0.1))
 
     last_distance_front = distance_front
 
-    if(last_distance_back == 0):
+    if last_distance_back == 0:
         distance_back = random.choice(np.arange(MIN_DISTANCE_BACK, MAX_DISTANCE_BACK, 0.1))
     else:
         distance_back = 0
-        while(distance_back < MIN_DISTANCE_BACK or distance_back > MAX_DISTANCE_BACK):
+        while distance_back < MIN_DISTANCE_BACK or distance_back > MAX_DISTANCE_BACK:
             distance_back = random.choice(np.arange((1-MAX_CHANGE_RATE_PERCENT)*last_distance_back,(1+MAX_CHANGE_RATE_PERCENT)*last_distance_back, 0.1))
 
     last_distance_back = distance_back
