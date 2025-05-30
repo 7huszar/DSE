@@ -19,7 +19,7 @@ docker push localhost:32000/passenger:latest
 docker push localhost:32000/visor:latest
 
 
-jq -c '.[]' vehicles.json | while read -r record; do
+jq -c '.[]' ./src/vehicle/data_mock/vehicles.json | while read -r record; do
 
   VIN=$(echo "$record" | jq -r '.vin')
   VIN_LOWER=${VIN,,}
@@ -37,7 +37,7 @@ jq -c '.[]' vehicles.json | while read -r record; do
 
 done
 
-microk8s kubectl create configmap vehicle-data --from-file=vehicles.json=./vehicles.json
+microk8s kubectl apply -f ./configuration/data_mock_config.yaml
 
 echo "apply deployment files"
 microk8s kubectl apply -f ./src/backend/location_tracker/deployment.yaml

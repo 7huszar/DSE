@@ -1,4 +1,5 @@
 import json
+import os
 import time
 
 import logging
@@ -8,7 +9,13 @@ import requests
 import random
 import numpy as np
 
-vehicle_config = None
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+)
+logger = logging.getLogger(__name__)
+
+
 with open("vehicles.json", "r") as f:
     vehicle_config = json.load(f)
 
@@ -16,24 +23,19 @@ with open("vehicles.json", "r") as f:
 
 BASE_URI = "http://location-sender-{}/data"
 
-MAX_DISTANCE_FRONT = 50 #in m
-MIN_DISTANCE_FRONT = 0.5
+MAX_DISTANCE_FRONT = float(os.environ.get("MAX_DST_FRONT", 50))
 
-MAX_DISTANCE_BACK = 50
-MIN_DISTANCE_BACK = 0.5
+MIN_DISTANCE_FRONT = float(os.environ.get("MIN_DST_FRONT", 0.5))
 
-MAX_CHANGE_RATE_PERCENT = 0.15
+MAX_DISTANCE_BACK = float(os.environ.get("MAX_DST_BACK", 50))
+MIN_DISTANCE_BACK = float(os.environ.get("MIN_DST_BACK", 0.5))
 
-last_distance_back = 0
-last_distance_front = 0
+MAX_CHANGE_RATE_PERCENT = float(os.environ.get("MAX_CHANGE_RATE", 0.15))
+
+last_distance_back = float(os.environ.get("LAST_DST_BACK", 0))
+last_distance_front = float(os.environ.get("LAST_DST_FRONT", 0))
 
 ### CONSTANTS END ###
-
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-)
-logger = logging.getLogger(__name__)
 
 vehicles = []
 for vehicle in vehicle_config:

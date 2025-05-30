@@ -17,3 +17,39 @@ spec:
           image: localhost:32000/data-mock:latest
           ports:
             - containerPort: 5000
+          env:
+            - name: MAX_DST_FRONT
+              valueFrom:
+                configMapKeyRef:
+                  key: max_dst_front
+                  name: data-mock-config
+            - name: MIN_DST_FRONT
+              valueFrom:
+                configMapKeyRef:
+                  key: min_dst_front
+                  name: data-mock-config
+            - name: MAX_DST_BACK
+              valueFrom:
+                configMapKeyRef:
+                  key: max_dst_back
+                  name: data-mock-config
+            - name: MIN_DST_BACK
+              valueFrom:
+                configMapKeyRef:
+                  key: min_dst_back
+                  name: data-mock-config
+            - name: MAX_CHANGE_RATE
+              valueFrom:
+                configMapKeyRef:
+                  key: max_change_rate
+                  name: data-mock-config
+            - name: LAST_DISTANCE_BACK
+              valueFrom:
+                configMapKeyRef:
+                  key: last_distance_back
+                  name: data-mock-config
+            - name: LAST_DISTANCE_FRONT
+              valueFrom:
+                configMapKeyRef:
+                  key: last_distance_front
+                  name: data-mock-config

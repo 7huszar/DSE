@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: data-mock-config
+data:
+  # in meters
+  max_dst_front: "50"
+  # in meters
+  min_dst_front: "0.5"
+  # in meters
+  max_dst_back: "50"
+  # in meters
+  min_dst_back: "0.5"
+  # in %
+  max_change_rate: "0.15"
+  # in meters
+  last_distance_back: "0"
+  # in meters
+  last_distance_front: "0"

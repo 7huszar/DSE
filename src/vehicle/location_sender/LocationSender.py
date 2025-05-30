@@ -24,7 +24,7 @@ credential = None
 
 RABBITMQ_USER = os.environ['RABBITMQ_USER']
 RABBITMQ_PASSWORD = os.environ['RABBITMQ_PASSWORD']
-RABBITMQ_PORT = int(os.environ['RABBIT_PORT'])
+RABBITMQ_PORT = int(os.environ.get('RABBIT_PORT', 5672))
 
 retry_queue = queue.Queue()
 connection_dead = threading.Condition()
@@ -59,6 +59,10 @@ def get_rabbitmq_connection():
 def establish_connection():
     global connection
     not_succeeded = True
+    if not connection is None:
+        if not connection.is_closed:
+            return
+
     while not_succeeded:
         try:
             connection = get_rabbitmq_connection()
@@ -98,7 +102,8 @@ def reestablish_connection():
 
 
     while True:
-        connection_dead.wait()
+        with connection_dead:
+            connection_dead.wait()
         establish_connection()
         open_channel()
 
@@ -114,7 +119,8 @@ def process_failed_msg():
                 retry_queue.not_empty.wait()
 
         if channel.is_closed or connection.is_closed:
-            connection_dead.notify_all()
+            with connection_dead:
+                connection_dead.notify_all()
             time.sleep(RETRY_WAIT)
             continue
 
@@ -132,7 +138,8 @@ def process_failed_msg():
                 )
             except (AMQPChannelError, AMQPConnectionError) as e:
                 logger.warning(f"Failed to resend msg: {repr(e)}")
-                connection_dead.notify_all()
+                with connection_dead:
+                    connection_dead.notify_all()
                 retry_queue.put(pkg)
                 break
 
@@ -161,14 +168,11 @@ def receive_data():
             body=json.dumps(data).encode("utf-8")
         )
 
-    except AMQPConnectionError as e:
-        logger.warning(f"Failed to send message to broker with routing key: 'backend.location.tracker' because of connection error: {repr(e)}")
+    except (AMQPConnectionError, AMQPChannelError) as e:
+        logger.warning(f"Failed to send message to broker with routing key: 'backend.location.tracker' because of connection/channel error: {repr(e)}")
         retry_queue.put(data)
-        connection_dead.notify_all()
-    except AMQPChannelError as e:
-        logger.warning(f"Failed to send message to broker with routing key: 'backend.location.tracker' because of channel error: {repr(e)}")
-        retry_queue.put(data)
-        connection_dead.notify_all()
+        with connection_dead:
+            connection_dead.notify_all()
 
 
     try:
@@ -178,14 +182,11 @@ def receive_data():
             body=json.dumps(data).encode("utf-8")
         )
 
-    except AMQPConnectionError as e:
-        logger.warning(f"Failed to send message to broker with routing key: 'backend.location.passenger' because of connection error: {repr(e)}")
+    except (AMQPConnectionError, AMQPChannelError) as e:
+        logger.warning(f"Failed to send message to broker with routing key: 'backend.location.passenger' because of connection/channel error: {repr(e)}")
         retry_queue.put(data)
-        connection_dead.notify_all()
-    except AMQPChannelError as e:
-        logger.warning(f"Failed to send message to broker with routing key: 'backend.location.passenger' because of channel error: {repr(e)}")
-        retry_queue.put(data)
-        connection_dead.notify_all()
+        with connection_dead:
+            connection_dead.notify_all()
 
     return jsonify({"status": "ok"}), 200
 
