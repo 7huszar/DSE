@@ -190,5 +190,7 @@ def receive_data():
     return jsonify({"status": "ok"}), 200
 
 if __name__ == '__main__':
+    threading.Thread(target=process_failed_msg, daemon=True).start()
+    threading.Thread(target=reestablish_connection, daemon=True).start()
     # Start Flask app
     app.run(host='0.0.0.0', port=5000)
