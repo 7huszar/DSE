@@ -4,6 +4,16 @@ microk8s kubectl apply -f "https://github.com/rabbitmq/cluster-operator/releases
 microk8s kubectl apply -f ./src/backend/rabbit_mq/rabbit_mq.yaml
 microk8s kubectl apply -f ./src/backend/rabbit_mq/rabbitmq-configmap.yaml
 
+microk8s helm3 repo add grafana https://grafana.github.io/helm-charts
+microk8s helm3 install loki grafana/loki-stack --set grafana.enabled=true,fluent-bit.enabled=true,promtail.enabled=false --set fluent-bit.inputTail.Mem_Buf_Limit=50MB -n monitoring --create-namespace
+
+microk8s helm3 upgrade loki grafana/loki-stack \
+  --set grafana.enabled=true \
+  --set fluent-bit.enabled=true \
+  --set promtail.enabled=false \
+  --set fluent-bit.inputTail.Mem_Buf_Limit=200MB \
+  -n monitoring
+
 echo "build docker images"
 docker build -t localhost:32000/location-tracker:latest ./src/backend/location_tracker/
 docker build -t localhost:32000/location-sender:latest ./src/vehicle/location_sender/
@@ -74,5 +84,7 @@ microk8s kubectl rollout restart deployment/location-tracker
 microk8s kubectl rollout restart deployment/data-mock
 microk8s kubectl rollout restart deployment/passenger
 microk8s kubectl rollout restart deployment/visor
-#microk8s kubectl rollout restart deployment/lt-postgres
-#microk8s kubectl rollout restart deployment/cd-postgres
+microk8s kubectl rollout restart deployment/lt-postgres
+microk8s kubectl rollout restart deployment/cd-postgres
+
+microk8s kubectl port-forward svc/loki-grafana -n monitoring 3000:80 &

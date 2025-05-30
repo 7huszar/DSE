@@ -21,3 +21,14 @@ microk8s enable registry
 - sudo microk8s kubectl apply -f deployment.yaml
 
 - sudo microk8s kubectl apply -f service.yaml 
+
+## Logs:
+
+- make sure ```microk8s enable helm3 ```
+
+- run ./deploy.sh
+
+- call http://localhost:3000
+
+- user is "admin" and you can retrieve pwd with:
+``` kubectl get secret -n monitoring loki-grafana -o jsonpath="{.data.admin-password}" | base64 --decode ; echo ```
