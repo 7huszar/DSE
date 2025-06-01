@@ -13,7 +13,3 @@ data:
   min_dst_back: "0.5"
   # in %
   max_change_rate: "0.15"
-  # in meters
-  last_distance_back: "0"
-  # in meters
-  last_distance_front: "0"

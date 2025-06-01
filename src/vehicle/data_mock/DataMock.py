@@ -23,23 +23,41 @@ with open("vehicles.json", "r") as f:
 
 BASE_URI = "http://location-sender-{}/data"
 
-MAX_DISTANCE_FRONT = float(os.environ.get("MAX_DST_FRONT", 50))
+MAX_DST_FRONT = float(os.environ.get("MAX_DST_FRONT", 50))
 
-MIN_DISTANCE_FRONT = float(os.environ.get("MIN_DST_FRONT", 0.5))
+MIN_DST_FRONT = float(os.environ.get("MIN_DST_FRONT", 0.5))
 
-MAX_DISTANCE_BACK = float(os.environ.get("MAX_DST_BACK", 50))
-MIN_DISTANCE_BACK = float(os.environ.get("MIN_DST_BACK", 0.5))
+MAX_DST_BACK = float(os.environ.get("MAX_DST_BACK", 50))
+MIN_DST_BACK = float(os.environ.get("MIN_DST_BACK", 0.5))
 
 MAX_CHANGE_RATE_PERCENT = float(os.environ.get("MAX_CHANGE_RATE", 0.15))
 
-last_distance_back = float(os.environ.get("LAST_DST_BACK", 0))
-last_distance_front = float(os.environ.get("LAST_DST_FRONT", 0))
-
 ### CONSTANTS END ###
+
+logger.info("Started data mock with configuration:\n"
+            f"MAX_DST_FRONT: {MAX_DST_FRONT}, "
+            f"MIN_DST_FRONT: {MIN_DST_FRONT}, "
+            f"MAX_DST_BACK: {MAX_DST_BACK}, "
+            f"MIN_DST_BACK: {MIN_DST_BACK}, "
+            f"MAX_CHANGE_RATE: {MAX_CHANGE_RATE_PERCENT}")
 
 vehicles = []
 for vehicle in vehicle_config:
-    vehicles.append(Vehicle(vehicle["vin"], velocity=vehicle["vel"], longitude=vehicle["lon"], latitude=vehicle["lat"], direction=vehicle["dir"]))
+    vehicles.append(
+        Vehicle(
+            vin=vehicle["vin"],
+            velocity=vehicle["vel"],
+            longitude=vehicle["lon"],
+            latitude=vehicle["lat"],
+            direction=vehicle["dir"],
+            dst_back=vehicle["dst_back"],
+            dst_front=vehicle["dst_front"]
+        )
+    )
+
+print("Init data mock with car:")
+for vehicle in vehicles:
+    print(vehicle)
 
 def update_car(vehicle):
 
@@ -49,19 +67,19 @@ def update_car(vehicle):
     new_coord = vehicle.sample(0, 0)
 
     if last_distance_front == 0:
-        distance_front = random.choice(np.arange(MIN_DISTANCE_FRONT, MAX_DISTANCE_FRONT, 0.1))
+        distance_front = random.choice(np.arange(MIN_DST_FRONT, MAX_DST_FRONT, 0.1))
     else:
         distance_front = 0
-        while distance_front < MIN_DISTANCE_FRONT or distance_front > MAX_DISTANCE_FRONT:
+        while distance_front < MIN_DST_FRONT or distance_front > MAX_DST_FRONT:
             distance_front = random.choice(np.arange((1-MAX_CHANGE_RATE_PERCENT)*last_distance_front,(1+MAX_CHANGE_RATE_PERCENT)*last_distance_front, 0.1))
 
     last_distance_front = distance_front
 
     if last_distance_back == 0:
-        distance_back = random.choice(np.arange(MIN_DISTANCE_BACK, MAX_DISTANCE_BACK, 0.1))
+        distance_back = random.choice(np.arange(MIN_DST_BACK, MAX_DST_BACK, 0.1))
     else:
         distance_back = 0
-        while distance_back < MIN_DISTANCE_BACK or distance_back > MAX_DISTANCE_BACK:
+        while distance_back < MIN_DST_BACK or distance_back > MAX_DST_BACK:
             distance_back = random.choice(np.arange((1-MAX_CHANGE_RATE_PERCENT)*last_distance_back,(1+MAX_CHANGE_RATE_PERCENT)*last_distance_back, 0.1))
 
     last_distance_back = distance_back
