@@ -11,5 +11,5 @@ data:
   max_dst_back: "50"
   # in meters
   min_dst_back: "0.5"
-  # in %
-  max_change_rate: "0.15"
+  # in seconds
+  sampling_time: "2"

@@ -1,20 +1,20 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: location-sender-${VIN_LOWER}
+  name: distance-monitor-${VIN_LOWER}
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: location-sender
+      app: distance-monitor
   template:
     metadata:
       labels:
-        app: location-sender
+        app: distance-monitor
     spec:
       containers:
-        - name: location-sender
-          image: localhost:32000/location-sender:latest
+        - name: distance-monitor
+          image: localhost:32000/distance-monitor:latest
           ports:
             - containerPort: 5000
           envFrom:
@@ -33,3 +33,23 @@ spec:
                 secretKeyRef:
                   name: rabbitmq-default-user
                   key: password
+            - name: RABBITMQ_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: rabbitmq-default-user
+                  key: host
+            - name: RABBITMQ_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: rabbitmq-default-user
+                  key: port
+            - name: FLASK_HOST
+              valueFrom:
+                configMapKeyRef:
+                  key: flask_host
+                  name: distance-monitor-config
+            - name: FLASK_PORT
+              valueFrom:
+                configMapKeyRef:
+                  key: flask_port
+                  name: distance-monitor-config

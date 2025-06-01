@@ -5,9 +5,9 @@ FROM python:3.9-slim
 WORKDIR /DataMock
 
 # Copy the application code
-COPY DataMock.py /DataMock
-COPY vehicle.py /DataMock
-COPY vehicles.json /DataMock
+COPY ./src/vehicle/data_mock/DataMock.py .
+COPY ./src/vehicle/data_mock/vehicle.py .
+COPY vehicles.json .
 
 # Install dependencies
 RUN pip install flask requests

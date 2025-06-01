@@ -38,18 +38,8 @@ spec:
                 configMapKeyRef:
                   key: min_dst_back
                   name: data-mock-config
-            - name: MAX_CHANGE_RATE
+            - name: SAMPLING_TIME
               valueFrom:
                 configMapKeyRef:
-                  key: max_change_rate
-                  name: data-mock-config
-            - name: LAST_DISTANCE_BACK
-              valueFrom:
-                configMapKeyRef:
-                  key: last_distance_back
-                  name: data-mock-config
-            - name: LAST_DISTANCE_FRONT
-              valueFrom:
-                configMapKeyRef:
-                  key: last_distance_front
+                  key: sampling_time
                   name: data-mock-config

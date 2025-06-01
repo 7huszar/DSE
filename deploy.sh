@@ -20,8 +20,9 @@ microk8s helm3 upgrade loki grafana/loki-stack \
 
 echo "build docker images"
 docker build -t localhost:32000/location-tracker:latest ./src/backend/location_tracker/
-docker build -t localhost:32000/location-sender:latest ./src/vehicle/location_sender/
-docker build -t localhost:32000/data-mock:latest ./src/vehicle/data_mock/
+docker build -t localhost:32000/location-sender:latest -f ./src/vehicle/location_sender/Dockerfile .
+docker build -t localhost:32000/data-mock:latest -f ./src/vehicle/data_mock/Dockerfile .
+docker build -t localhost:32000/distance-monitor:latest -f ./src/vehicle/distance_monitor/Dockerfile .
 docker build -t localhost:32000/passenger:latest ./src/passenger/
 docker build -t localhost:32000/visor:latest ./src/frontend/
 
@@ -31,9 +32,10 @@ docker push localhost:32000/location-sender:latest
 docker push localhost:32000/data-mock:latest
 docker push localhost:32000/passenger:latest
 docker push localhost:32000/visor:latest
+docker push localhost:32000/distance-monitor:latest
 
 
-jq -c '.[]' ./src/vehicle/data_mock/vehicles.json | while read -r record; do
+jq -c '.[]' vehicles.json | while read -r record; do
 
   VIN=$(echo "$record" | jq -r '.vin')
   VIN_LOWER=${VIN,,}
@@ -46,12 +48,17 @@ jq -c '.[]' ./src/vehicle/data_mock/vehicles.json | while read -r record; do
 
   envsubst < ./src/vehicle/location_sender/service.yaml | microk8s kubectl apply -f -
 
-  microk8s kubectl rollout restart deployment/location-sender-"$VIN_LOWER"
+  envsubst < ./src/vehicle/distance_monitor/deployment.yaml | microk8s kubectl apply -f -
 
+  envsubst < ./src/vehicle/distance_monitor/service.yaml | microk8s kubectl apply -f -
+
+
+  microk8s kubectl rollout restart deployment/location-sender-"$VIN_LOWER"
+  microk8s kubectl rollout restart deployment/distance_monitor-"$VIN_LOWER"
 
 done
 
-microk8s kubectl apply -f ./configuration/data_mock_config.yaml
+microk8s kubectl apply -f ./configuration/
 
 echo "apply deployment files"
 microk8s kubectl apply -f ./src/backend/location_tracker/deployment.yaml
