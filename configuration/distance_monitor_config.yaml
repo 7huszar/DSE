@@ -3,5 +3,6 @@ kind: ConfigMap
 metadata:
   name: distance-monitor-config
 data:
-  flask_host: "0.0.0.0"
-  flask_port: "5000"
+  FLASK_HOST: "0.0.0.0"
+  FLASK_PORT: "5000"
+  RETRY_WAIT: "5"

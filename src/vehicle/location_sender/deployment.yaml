@@ -21,7 +21,7 @@ spec:
             - configMapRef:
                 name: rabbit-mq-configmap
             - configMapRef:
-                name: location-tracker-configmap
+                name: location-sender-config
           env:
             - name: RABBITMQ_USER
               valueFrom:
