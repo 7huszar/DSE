@@ -1,91 +1,31 @@
-import time
-import pika
 import os
-import json
-import logging
-import requests
-from pika.exceptions import AMQPConnectionError
 
-### CONSTANTS START ###
-RETRY_WAIT = 5
-DATA_MOCK_URL = "http://data-mock-service/stop"  # URL to send stop command
-### CONSTANTS END ###
+from src.vehicle.base_rabbitmq_connection import BaseRabbitMqConnection
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-)
-logger = logging.getLogger(__name__)
+from flask import Flask, requests
 
-# RabbitMQ connection
-credentials = pika.PlainCredentials(
-    username=os.environ['RABBITMQ_USER'],
-    password=os.environ['RABBITMQ_PASSWORD']
-)
+class EmergencyBrake(BaseRabbitMqConnection):
 
-def get_rabbitmq_connection():
-    return pika.BlockingConnection(
-        pika.ConnectionParameters(
-            host='rabbitmq',
-            port=int(os.environ.get('RABBITMQ_PORT', 5672)),
-            credentials=credentials
-        )
-    )
+    def __init__(self):
+        super().__init__()
+        self.vin = "tmp"
+        self.app = Flask(__name__)
 
-# Callback for emergency brake commands
-def emergency_brake_callback(ch, method, properties, body):
-    """Process emergency brake commands from Central Director"""
-    try:
-        command_data = json.loads(body.decode('utf-8'))
-        logger.warning(f"EMERGENCY BRAKE ACTIVATED: {command_data}")
+        self.FLASK_HOST: str = os.environ.get("FLASK_HOST", "0.0.0.0")
+        self.FLASK_PORT: int = int(os.environ.get("FLASK_PORT", 5000))
 
-        if command_data.get('command') == 'emergency_stop':
-            # Send stop command to Data Mock via message broker
-            # Publishing to a topic that Data Mock will listen to
-            channel.basic_publish(
-                exchange='broker',
-                routing_key='vehicle.control.stop',
-                body=json.dumps({
-                    "command": "stop",
-                    "velocity": 0,
-                    "reason": command_data.get('reason', 'emergency'),
-                    "timestamp": time.time()
-                }).encode('utf-8')
-            )
-            logger.info("Stop command sent to vehicle!")
+        self.app.add_url_rule("/trigger", view_func=self.trigger_brake, methods=["POST"])
 
-    except Exception as e:
-        logger.error(f"Error processing emergency brake command: {e}")
+    def trigger_brake(self):
+        requests.post(f"http://data-mock/{self.vin}")
 
-# Setup RabbitMQ connection
-not_succeeded = True
-connection = None
-while not_succeeded:
-    try:
-        connection = get_rabbitmq_connection()
-        not_succeeded = False
-    except AMQPConnectionError as e:
-        logger.warning(f"Failed to establish connection: {repr(e)}. Retrying in {RETRY_WAIT} seconds.")
-        time.sleep(RETRY_WAIT)
 
-logger.info("Successfully connected to RabbitMQ")
-channel = connection.channel()
-channel.exchange_declare(exchange='broker', exchange_type='topic')
+    def run(self):
+        super().run()
 
-# Create queue for emergency brake commands
-result = channel.queue_declare(queue='emergency_brake_queue', exclusive=False)
-queue_name = result.method.queue
+        self.app.run(host=self.FLASK_HOST, port=self.FLASK_PORT)
 
-# Bind to emergency brake topic
-channel.queue_bind(exchange='broker', queue=queue_name, routing_key='vehicle.emergency.brake')
-
-# Start consuming
-channel.basic_consume(queue=queue_name, on_message_callback=emergency_brake_callback, auto_ack=True)
-
-logger.info("Emergency Brake Service started. Waiting for emergency commands...")
-try:
-    channel.start_consuming()
-except KeyboardInterrupt:
-    logger.info("Stopping Emergency Brake Service...")
-    channel.stop_consuming()
-    connection.close()
+if __name__ == "__main__":
+    service = EmergencyBrake()
+    service.log_stats()
+    service.run()

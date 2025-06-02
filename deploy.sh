@@ -99,3 +99,4 @@ microk8s kubectl rollout restart deployment/lt-postgres
 microk8s kubectl rollout restart deployment/cd-postgres
 
 microk8s kubectl port-forward svc/loki-grafana -n monitoring 3000:80 &
+microk8s kubectl port-forward service/visor-service 8080:80 &

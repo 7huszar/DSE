@@ -43,4 +43,6 @@ class LocationSenderService(BaseSenderService):
 
 
 if __name__ == '__main__':
-    LocationSenderService().run()
+    service = LocationSenderService()
+    service.log_stats()
+    service.run()
