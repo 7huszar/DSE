@@ -19,8 +19,13 @@ class Vehicle:
     def sample(self, acceleration, direction):
         delta_time = time.time() - self.internal_time
         self.internal_time += delta_time
+        self.acceleration = acceleration
+        self.direction = direction
 
-        distance = self.velocity * delta_time
+        # f(t) = t * acc + vel
+        # F(t) = 0.5(t^2) * acc + vel * t + C
+
+        distance = self.acceleration * (math.pow(delta_time, 2) / 2) + (self.velocity * delta_time)
 
         dx = self.direction[0] * distance
         dy = self.direction[1] * distance
