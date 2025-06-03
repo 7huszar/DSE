@@ -1,27 +1,20 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: location-sender-${VIN_LOWER}
+  name: emergency-brake
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: location-sender
+      app: emergency-brake
   template:
     metadata:
       labels:
-        app: location-sender
+        app: emergency-brake
     spec:
       containers:
-        - name: location-sender
-          image: localhost:32000/location-sender:latest
-          ports:
-            - containerPort: 5000
-          envFrom:
-            - configMapRef:
-                name: rabbit-mq-configmap
-            - configMapRef:
-                name: location-tracker-configmap
+        - name: emergency-brake
+          image: localhost:32000/emergency-brake:latest
           env:
             - name: RABBITMQ_USER
               valueFrom:
@@ -33,3 +26,7 @@ spec:
                 secretKeyRef:
                   name: rabbitmq-default-user
                   key: password
+            - name: RABBITMQ_HOST
+              value: "rabbitmq"
+            - name: RABBITMQ_PORT
+              value: "5672"
