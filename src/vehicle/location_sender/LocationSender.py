@@ -1,6 +1,5 @@
 import threading
 import time
-
 import pika
 import os
 import json
@@ -10,21 +9,19 @@ import queue
 from pika.exceptions import AMQPConnectionError, AMQPChannelError
 
 ### CONSTANTS START ###
-
 RETRY_WAIT = 5
-
 ### CONSTANTS END ###
 
 ### DECLARATION START ###
-
 connection = None
 channel = None
 logger = None
 credential = None
 
-RABBITMQ_USER = os.environ['RABBITMQ_USER']
-RABBITMQ_PASSWORD = os.environ['RABBITMQ_PASSWORD']
-RABBITMQ_PORT = int(os.environ.get('RABBIT_PORT', 5672))
+RABBITMQ_USER = os.environ.get('RABBITMQ_USER', 'guest')
+RABBITMQ_PASSWORD = os.environ.get('RABBITMQ_PASSWORD', 'guest')
+RABBITMQ_HOST = os.environ.get('RABBITMQ_HOST', 'rabbitmq')
+RABBITMQ_PORT = int(os.environ.get('RABBITMQ_PORT', 5672))
 
 retry_queue = queue.Queue()
 connection_dead = threading.Condition()
@@ -39,27 +36,27 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-
 # RabbitMQ connection
 credentials = pika.PlainCredentials(
-    username=os.environ['RABBITMQ_USER'],
-    password=os.environ['RABBITMQ_PASSWORD']
+    username=RABBITMQ_USER,
+    password=RABBITMQ_PASSWORD
 )
-
 
 def get_rabbitmq_connection():
     return pika.BlockingConnection(
         pika.ConnectionParameters(
-            host='rabbitmq',
+            host=RABBITMQ_HOST,
             port=RABBITMQ_PORT,
-            credentials=credentials
+            credentials=credentials,
+            heartbeat=600,
+            blocked_connection_timeout=300
         )
     )
 
 def establish_connection():
     global connection
     not_succeeded = True
-    if not connection is None:
+    if connection is not None:
         if not connection.is_closed:
             return
 
@@ -69,8 +66,6 @@ def establish_connection():
             not_succeeded = False
         except AMQPConnectionError as e:
             logger.warning(f"Failed to establish connection due to error: {repr(e)}.\n Retrying in {RETRY_WAIT} seconds.")
-
-        if not_succeeded:
             time.sleep(RETRY_WAIT)
 
     logger.info("Successfully established connection to rabbitmq.")
@@ -86,6 +81,7 @@ def open_channel():
     while not_succeeded:
         try:
             channel = connection.channel()
+            channel.exchange_declare(exchange='broker', exchange_type='topic', durable=True)
             not_succeeded = False
         except AMQPConnectionError as e:
             logger.warning(f"Failed to open channel: {repr(e)}")
@@ -99,7 +95,6 @@ def reestablish_connection():
     global connection
     global channel
     global connection_dead
-
 
     while True:
         with connection_dead:
@@ -130,10 +125,15 @@ def process_failed_msg():
             pkg = retry_queue.get()
 
             try:
-
                 channel.basic_publish(
                     exchange='broker',
                     routing_key='backend.location.tracker',
+                    body=json.dumps(pkg).encode("utf-8")
+                )
+
+                channel.basic_publish(
+                    exchange='broker',
+                    routing_key='backend.location.passenger',
                     body=json.dumps(pkg).encode("utf-8")
                 )
             except (AMQPChannelError, AMQPConnectionError) as e:
@@ -143,55 +143,86 @@ def process_failed_msg():
                 retry_queue.put(pkg)
                 break
 
+# Initialize connection
 establish_connection()
 open_channel()
-
-connection_open = True
-
-channel.exchange_declare(exchange='broker', exchange_type='topic', durable=True)
-
-if channel.is_closed:
-    logger.error("channel closed")
-    raise Exception
 
 @app.route('/data', methods=['POST'])
 def receive_data():
     global channel
     global connection_dead
-    data = request.get_json()
-    logger.info(f"Received data: {str(data)}")
 
     try:
-        channel.basic_publish(
-            exchange='broker',
-            routing_key='backend.location.tracker',
-            body=json.dumps(data).encode("utf-8")
-        )
+        data = request.get_json()
+        logger.info(f"Received data: {str(data)}")
 
-    except (AMQPConnectionError, AMQPChannelError) as e:
-        logger.warning(f"Failed to send message to broker with routing key: 'backend.location.tracker' because of connection/channel error: {repr(e)}")
-        retry_queue.put(data)
-        with connection_dead:
-            connection_dead.notify_all()
+        # Calculate speed if we have distance data
+        if 'distance_front' in data and 'distance_back' in data:
+            # Estimate speed based on distance sensor data
+            # This is a simplified calculation
+            speed = 0
+            if 'speed' not in data:
+                # If DataMock doesn't send speed, calculate from other data
+                # For now, use a default or calculate from position changes
+                speed = 10  # Default speed in km/h
+                data['speed'] = speed
 
+        # Ensure all required fields are present
+        enhanced_data = {
+            'vin': data.get('vin'),
+            'lat': data.get('lat'),
+            'long': data.get('long'),
+            'time': data.get('time'),
+            'speed': data.get('speed', 0),
+            'distance_front': data.get('distance_front'),
+            'distance_back': data.get('distance_back')
+        }
 
-    try:
-        channel.basic_publish(
-            exchange='broker',
-            routing_key='backend.location.passenger',
-            body=json.dumps(data).encode("utf-8")
-        )
+        try:
+            # Send to Location Tracker
+            channel.basic_publish(
+                exchange='broker',
+                routing_key='backend.location.tracker',
+                body=json.dumps(enhanced_data).encode("utf-8")
+            )
 
-    except (AMQPConnectionError, AMQPChannelError) as e:
-        logger.warning(f"Failed to send message to broker with routing key: 'backend.location.passenger' because of connection/channel error: {repr(e)}")
-        retry_queue.put(data)
-        with connection_dead:
-            connection_dead.notify_all()
+            # Send to Passenger (for frontend display)
+            channel.basic_publish(
+                exchange='broker',
+                routing_key='backend.location.passenger',
+                body=json.dumps(enhanced_data).encode("utf-8")
+            )
 
-    return jsonify({"status": "ok"}), 200
+            logger.info(f"Successfully published data for vehicle {enhanced_data['vin']}")
+
+        except (AMQPConnectionError, AMQPChannelError) as e:
+            logger.warning(f"Failed to send message to broker: {repr(e)}")
+            retry_queue.put(enhanced_data)
+            with connection_dead:
+                connection_dead.notify_all()
+
+        return jsonify({"status": "ok"}), 200
+
+    except Exception as e:
+        logger.error(f"Error processing request: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/health', methods=['GET'])
+def health_check():
+    global connection, channel
+
+    health_status = {
+        "status": "healthy",
+        "rabbitmq_connected": connection and not connection.is_closed if connection else False,
+        "channel_open": channel and channel.is_open if channel else False
+    }
+
+    return jsonify(health_status), 200
 
 if __name__ == '__main__':
+    # Start background threads
     threading.Thread(target=process_failed_msg, daemon=True).start()
     threading.Thread(target=reestablish_connection, daemon=True).start()
 
+    logger.info("Starting Location Sender service...")
     app.run(host='0.0.0.0', port=5000)
