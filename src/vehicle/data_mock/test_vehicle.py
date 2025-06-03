@@ -37,26 +37,26 @@ class TestVehicleSample(unittest.TestCase):
         time.sleep(0.1)
 
         # Call sample
-        new_position = self.vehicle1.sample(0, 0)
+        new_position = self.vehicle1.sample()
 
         # Check return value structure
         self.assertEqual(len(new_position), 3)
-        self.assertIsInstance(new_position[0], float)  # latitude
-        self.assertIsInstance(new_position[1], float)  # longitude
-        self.assertIsInstance(new_position[2], float)  # time
+        self.assertIsInstance(new_position["lat"], float)  # latitude
+        self.assertIsInstance(new_position["long"], float)  # longitude
+        self.assertIsInstance(new_position["internal_time"], float)  # time
 
         # Check that position has changed (vehicle moving east)
-        self.assertNotEqual(new_position[1], initial_lon)
-        self.assertEqual(new_position[0], self.vehicle1.latitude)
+        self.assertNotEqual(new_position["long"], initial_lon)
+        self.assertEqual(new_position["lat"], self.vehicle1.latitude)
 
         # Since direction is [1, 0] (east), latitude should stay same
-        self.assertAlmostEqual(initial_lat, new_position[0], places=5)
+        self.assertAlmostEqual(initial_lat, new_position["lat"], places=5)
 
         # Longitude should increase (moving east)
-        self.assertGreater(new_position[1], initial_lon)
+        self.assertGreater(new_position["long"], initial_lon)
 
         # Time should have increased
-        self.assertGreater(new_position[2], initial_time)
+        self.assertGreater(new_position["internal_time"], initial_time)
 
     def test_sample_distance_calculation(self):
         """Test that distance calculation is correct based on velocity and time"""
@@ -68,7 +68,7 @@ class TestVehicleSample(unittest.TestCase):
         time.sleep(1.0)  # 1 second
 
         # Call sample
-        new_position = self.vehicle2.sample(0, 0)
+        new_position = self.vehicle2.sample()
 
         # Vehicle 2 moves north at 5 m/s for ~1 second
         # Calculate expected latitude change
@@ -78,13 +78,13 @@ class TestVehicleSample(unittest.TestCase):
         expected_lat_change = (5.0 / self.vehicle2.earth_radius) * (180 / math.pi)
 
         # Check latitude increased (moving north)
-        actual_lat_change = new_position[0] - initial_lat
+        actual_lat_change = new_position["lat"] - initial_lat
 
         # Allow for some time measurement error
         self.assertAlmostEqual(actual_lat_change, expected_lat_change, places=6)
 
         # Longitude should stay the same (moving north only)
-        self.assertAlmostEqual(new_position[1], initial_lon, places=7)
+        self.assertAlmostEqual(new_position["long"], initial_lon, places=7)
 
 class TestVehicleScenarios(unittest.TestCase):
     """Test vehicle behavior in different scenarios"""
@@ -101,11 +101,11 @@ class TestVehicleScenarios(unittest.TestCase):
 
         initial_pos = [stationary.latitude, stationary.longitude]
         time.sleep(0.1)
-        new_pos = stationary.sample(0, 0)
+        new_pos = stationary.sample()
 
         # Position should not change
-        self.assertAlmostEqual(new_pos[0], initial_pos[0], places=10)
-        self.assertAlmostEqual(new_pos[1], initial_pos[1], places=10)
+        self.assertAlmostEqual(new_pos["lat"], initial_pos[0], places=10)
+        self.assertAlmostEqual(new_pos["long"], initial_pos[1], places=10)
 
     def test_diagonal_movement(self):
         """Test vehicle moving diagonally"""
@@ -121,11 +121,11 @@ class TestVehicleScenarios(unittest.TestCase):
         initial_lon = diagonal.longitude
 
         time.sleep(0.1)
-        new_pos = diagonal.sample(0, 0)
+        new_pos = diagonal.sample()
 
         # Both latitude and longitude should increase
-        self.assertGreater(new_pos[0], initial_lat)
-        self.assertGreater(new_pos[1], initial_lon)
+        self.assertGreater(new_pos["lat"], initial_lat)
+        self.assertGreater(new_pos["long"], initial_lon)
 
 def run_tests():
     """Run all tests and return results"""

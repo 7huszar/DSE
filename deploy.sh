@@ -48,8 +48,7 @@ docker build -t localhost:32000/data-mock:latest -f ./src/vehicle/data_mock/Dock
 docker build -t localhost:32000/distance-monitor:latest -f ./src/vehicle/distance_monitor/Dockerfile .
 docker build -t localhost:32000/passenger:latest ./src/passenger/
 docker build -t localhost:32000/visor:latest ./src/frontend/
-docker build -t localhost:32000/distance-monitor:latest ./src/vehicle/distance_monitor/
-docker build -t localhost:32000/emergency-brake:latest ./src/vehicle/emergency_brake/
+docker build -t localhost:32000/emergency-brake:latest -f ./src/vehicle/emergency_brake/Dockerfile .
 docker build -t localhost:32000/central-director:latest ./src/vehicle/central_director/
 
 echo "==================== PUSHING DOCKER IMAGES ===================="
@@ -64,7 +63,6 @@ docker push localhost:32000/central-director:latest
 
 echo "==================== APPLYING CONFIGURATIONS ===================="
 # Apply config maps
-microk8s kubectl apply -f ./configuration/data_mock_config.yaml
 microk8s kubectl apply -f ./src/backend/rabbit_mq/rabbitmq-configmap.yaml
 microk8s kubectl apply -f ./src/backend/location_tracker/location-tracker-configmap.yaml
 
@@ -84,7 +82,7 @@ microk8s kubectl apply -f ./src/backend/db/central_director_db/cd-ps-service.yam
 
 # Wait for databases to be ready
 echo "Waiting for databases to be ready..."
-sleep 20
+# sleep 20
 
 echo "==================== DEPLOYING VEHICLE SERVICES ===================="
 # Deploy location senders for each vehicle
@@ -149,9 +147,10 @@ microk8s kubectl rollout restart deployment/data-mock
 microk8s kubectl rollout restart deployment/passenger
 microk8s kubectl rollout restart deployment/visor
 microk8s kubectl rollout restart deployment/central-director
+microk8s kubectl rollout restart deployment/emergency_brake
 
 # Restart vehicle-specific deployments
-jq -c '.[]' ./src/vehicle/data_mock/vehicles.json | while read -r record; do
+jq -c '.[]' vehicles.json | while read -r record; do
     VIN=$(echo "$record" | jq -r '.vin')
     VIN_LOWER=${VIN,,}
     microk8s kubectl rollout restart deployment/location-sender-"$VIN_LOWER"
