@@ -31,6 +31,8 @@ class Vehicle:
 
         distance = self.acceleration * (math.pow(delta_time, 2.0) / 2.0) + (self.velocity * delta_time)
 
+        # x = longitude
+        # y = latitude
         dx = self.direction[0] * distance
         dy = self.direction[1] * distance
 

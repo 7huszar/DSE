@@ -7,11 +7,14 @@ WORKDIR /DataMock
 # Copy the application code
 COPY ./src/vehicle/data_mock/DataMock.py .
 COPY ./src/vehicle/data_mock/vehicle.py .
+COPY ./scenarios/ ./scenarios/
 COPY vehicles.json .
 
-# Install dependencies
-RUN pip install flask requests
-RUN pip install numpy
+RUN pip install pipreqs
+
+RUN pipreqs . --force --mode no-pin
+
+RUN pip install -r requirements.txt
 
 # Expose the application port
 EXPOSE 5000

@@ -1,13 +1,14 @@
 import json
 import os
 import time
-
 import logging
-
 from vehicle import Vehicle
 import requests
 from flask import Flask
 import numpy as np
+import importlib
+
+
 
 logging.basicConfig(
     level=logging.INFO,
@@ -36,6 +37,10 @@ SAMPLING_TIME = int(os.environ.get("SAMPLING_TIME", 2))
 
 TIMEOUT = int(os.environ.get("TIMOUT", 5))
 
+SCENARIO = os.getenv("SCENARIO")
+
+scenario_module = importlib.import_module(f"scenarios.{SCENARIO}")
+
 BRAKE_DECELERATION = float(os.environ.get("BRAKE_DECELERATION", -10.0))
 
 ### CONSTANTS END ###
@@ -56,11 +61,13 @@ vehicles = {
         longitude=vehicle["lon"],
         latitude=vehicle["lat"],
         direction=np.array(vehicle["dir"], dtype=float),
-        dst_back=vehicle["dst_back"],
         dst_front=vehicle["dst_front"]
     )
     for vehicle in vehicle_config
 }
+
+
+
 print("Init data mock with car(s):")
 for vehicle in vehicles:
     print(vehicle)
@@ -69,42 +76,49 @@ for vehicle in vehicles:
 def trigger_break(vin: str):
     vehicles.get(vin).sample(acceleration=BRAKE_DECELERATION)
 
+def send_data(addr: str, data):
+    logger.info(f"Send data to {addr} with body:{str(addr)}")
+
+    try:
+        response = requests.post(addr, json=data, timeout=TIMEOUT)
+        if response.ok:
+            logger.info(f"Successful post request to {addr}. \nResponse status: {response.status_code}\n Response body: {response.text}")
+        else:
+            logger.warning(f"Failed post request to {addr}. \nResponse status: {response.status_code}\n Response body: {response.text}")
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Request for {addr} failed:\n{repr(e)}")
+
+
 
 def update_car(vehicle):
+    """Update vehicle position and send data"""
 
+    # Get new position
     new_coord = vehicle.sample()
 
-    data = {
+    front_dst = scenario_module.compute_dst_front(vehicle)
+
+    data_loc = {
             "vin": vehicle.vin,
             "lat": float(new_coord["lat"]),
             "long": float(new_coord["long"]),
             "time": float(new_coord["internal_time"]),
+            "speed": vehicle.velocity * 3.6
     }
 
-
     addr_loc = BASE_URI_LOC.format(vehicle.vin.lower())
-    logger.info(f"Send data to {addr_loc} with body:{str(data)}")
 
-    try:
-        response = requests.post(addr_loc, json=data, timeout=TIMEOUT)
+    send_data(addr_loc, data_loc)
 
-        if response.ok:
-            logger.info(f"Successful post request to {addr_loc}. \nResponse status: {response.status_code}\n Response body: {response.text}")
-        else:
-            logger.warning(f"Failed post request to {addr_loc}. \nResponse status: {response.status_code}\n Response body: {response.text}")
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Request for {addr_loc} failed:\n{repr(e)}")
+    data_mon = {
+        "vin": vehicle.vin,
+        "dst_front": front_dst,
+        "speed": vehicle.velocity * 3.6
+    }
 
-#    addr_mon = BASE_URI_MON.format(vehicle.vin.lower())
-#
-#    try:
-#        response = requests.post(addr_mon, json={"dst_front": 7}, timeout=TIMEOUT)
-#        if response.ok:
-#           logger.info(f"Successful post request to {addr_mon}. \nResponse status: {response.status_code}\n Response body: {response.text}")
-#        else:
-#            logger.warning(f"Failed post request to {addr_mon}. \nResponse status: {response.status_code}\n Response body: {response.text}")
-#    except requests.exceptions.RequestException as e:
-#        logger.error(f"Request for {addr_mon} failed:\n{repr(e)}")
+    addr_mon = BASE_URI_MON.format(vehicle.vin.lower())
+
+    send_data(addr_mon, data_mon)
 
 while True:
     for vehicle in vehicles.values():

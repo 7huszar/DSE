@@ -43,3 +43,8 @@ spec:
                 configMapKeyRef:
                   key: sampling_time
                   name: data-mock-config
+            - name: SCENARIO
+              valueFrom:
+                configMapKeyRef:
+                  key: scenario
+                  name: data-mock-config
