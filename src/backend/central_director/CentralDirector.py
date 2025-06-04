@@ -184,7 +184,6 @@ distance_queue = channel.queue_declare(queue='central_director_distance_queue', 
 location_queue = channel.queue_declare(queue='central_director_location_queue', durable=True)
 
 # Bind queues to topics
-channel.queue_bind(exchange='broker', queue=distance_queue.method.queue, routing_key='backend.distance.*') # TODO: myb delete
 channel.queue_bind(exchange='broker', queue=location_queue.method.queue, routing_key='backend.location.tracker')
 channel.queue_bind(exchange='broker', queue=distance_queue.method.queue, routing_key='backend.distance.front')
 
