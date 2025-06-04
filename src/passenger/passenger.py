@@ -83,6 +83,42 @@ def get_specific_vehicle_api(vin):
         return jsonify(vehicle)
     return jsonify({"error": f"Vehicle VIN {vin} not found"}), 404
 
+@app.route('/emergency-brake', methods=['POST'])
+def trigger_emergency_brake():
+    """Handle emergency brake requests from Visor"""
+    data = request.get_json()
+    vin = data.get('vin')
+    source = data.get('source', 'Unknown')
+
+    if not vin:
+        return jsonify({"error": "VIN is required"}), 400
+
+    # Publish emergency brake request to Central Director
+    try:
+        credentials = pika.PlainCredentials(RABBITMQ_USER, RABBITMQ_PASSWORD)
+        connection = pika.BlockingConnection(pika.ConnectionParameters(
+            host=RABBITMQ_HOST, port=RABBITMQ_PORT, credentials=credentials
+        ))
+        channel = connection.channel()
+
+        message = {
+            'vin': vin,
+            'source': source,
+            'timestamp': time.time()
+        }
+
+        channel.basic_publish(
+            exchange=EXCHANGE_NAME,
+            routing_key='backend.emergency.request',
+            body=json.dumps(message).encode('utf-8')
+        )
+
+        connection.close()
+        return jsonify({"status": "Emergency brake request sent", "vin": vin}), 200
+    except Exception as e:
+        print(f"[Passenger] Error sending emergency brake request: {e}")
+        return jsonify({"error": "Failed to send emergency brake request"}), 500
+
 @socketio.on('connect')
 def handle_socketio_client_connect():
     print(f"[Passenger-SocketIO] Client connected (SID: {request.sid})")

@@ -50,6 +50,7 @@ docker build -t localhost:32000/passenger:latest ./src/passenger/
 docker build -t localhost:32000/visor:latest ./src/frontend/
 docker build -t localhost:32000/emergency-brake:latest -f ./src/vehicle/emergency_brake/Dockerfile .
 docker build -t localhost:32000/central-director:latest ./src/vehicle/central_director/
+docker build -t localhost:32000/backend-distance-monitor:latest -f ./src/backend/distance_monitor/Dockerfile ./src/backend/distance_monitor/
 
 echo "==================== PUSHING DOCKER IMAGES ===================="
 docker push localhost:32000/location-tracker:latest
@@ -60,6 +61,7 @@ docker push localhost:32000/visor:latest
 docker push localhost:32000/distance-monitor:latest
 docker push localhost:32000/emergency-brake:latest
 docker push localhost:32000/central-director:latest
+docker push localhost:32000/backend-distance-monitor:latest
 
 echo "==================== APPLYING CONFIGURATIONS ===================="
 # Apply config maps
@@ -109,6 +111,8 @@ microk8s kubectl apply -f ./configuration/
 echo "apply deployment files"
 microk8s kubectl apply -f ./src/backend/location_tracker/deployment.yaml
 microk8s kubectl apply -f ./src/backend/rabbit_mq/rabbit_mq.yaml
+microk8s kubectl apply -f ./src/backend/distance_monitor/deployment.yaml
+
 microk8s kubectl apply -f ./src/vehicle/data_mock/deployment.yaml
 microk8s kubectl apply -f ./src/vehicle/data_mock/service.yaml
 
