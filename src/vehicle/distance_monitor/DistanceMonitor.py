@@ -1,4 +1,6 @@
 import json
+import os
+import time
 
 import requests
 from flask import request, jsonify
@@ -10,8 +12,20 @@ from src.vehicle.base_sender_service import BaseSenderService
 class DistanceMonitorService(BaseSenderService):
 
     def __init__(self):
-        self.vin: str = "tmp"
+        self.vin: str = os.environ.get("VIN")
         super().__init__()
+
+    def send_data(self, addr: str, data):
+        self.logger.info(f"Send data to {addr} with body:{str(addr)}")
+
+        try:
+            response = requests.post(addr, json=data, timeout=5)
+            if response.ok:
+                self.logger.info(f"Successful post request to {addr}. \nResponse status: {response.status_code}\n Response body: {response.text}")
+            else:
+                self.logger.warning(f"Failed post request to {addr}. \nResponse status: {response.status_code}\n Response body: {response.text}")
+        except requests.exceptions.RequestException as e:
+            self.logger.error(f"Request for {addr} failed:\n{repr(e)}")
 
 
     def receive_data(self):
@@ -19,8 +33,12 @@ class DistanceMonitorService(BaseSenderService):
         self.logger.info(f"Received data: {str(data)}")
 
         dst_front = float(data["dst_front"])
-        if dst_front < 0.5:
-            requests.post(f"http://data-mock/break/{self.vin}")
+        if dst_front < 16.0:
+            trigger_data = {
+                "time": time.time()
+            }
+            self.logger.info(f"Trigger emergency brake, because frontal distance is {dst_front} < 16.0")
+            self.send_data(f"http://emergency-brake-{self.vin.lower()}/trigger", trigger_data)
 
         try:
             self.channel.basic_publish(

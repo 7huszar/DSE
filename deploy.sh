@@ -86,10 +86,11 @@ echo "Waiting for databases to be ready..."
 
 echo "==================== DEPLOYING VEHICLE SERVICES ===================="
 # Deploy location senders for each vehicle
-jq -c '.[]' ./src/vehicle/data_mock/vehicles.json | while read -r record; do
+jq -c '.[]' vehicles.json | while read -r record; do
     VIN=$(echo "$record" | jq -r '.vin')
     VIN_LOWER=${VIN,,}
     export VIN_LOWER
+    export VIN
 
     echo "Deploying services for vehicle with VIN: $VIN as location-sender-$VIN_LOWER"
 
@@ -100,6 +101,10 @@ jq -c '.[]' ./src/vehicle/data_mock/vehicles.json | while read -r record; do
     # Distance Monitor (per vehicle)
     envsubst < ./src/vehicle/distance_monitor/deployment.yaml | microk8s kubectl apply -f -
     envsubst < ./src/vehicle/distance_monitor/service.yaml | microk8s kubectl apply -f -
+
+    envsubst < ./src/vehicle/emergency_brake/deployment.yaml | microk8s kubectl apply -f -
+    envsubst < ./src/vehicle/emergency_brake/service.yaml | microk8s kubectl apply -f -
+
 done
 
 echo "==================== DEPLOYING CORE SERVICES ===================="
@@ -113,7 +118,6 @@ microk8s kubectl apply -f ./src/vehicle/data_mock/deployment.yaml
 microk8s kubectl apply -f ./src/vehicle/data_mock/service.yaml
 
 microk8s kubectl apply -f ./src/vehicle/central_director/cd-deployment.yaml
-microk8s kubectl apply -f ./src/vehicle/emergency_brake/deployment.yaml
 
 microk8s kubectl apply -f ./src/passenger/deployment.yaml
 microk8s kubectl apply -f ./src/frontend/deployment.yaml
@@ -147,7 +151,6 @@ microk8s kubectl rollout restart deployment/data-mock
 microk8s kubectl rollout restart deployment/passenger
 microk8s kubectl rollout restart deployment/visor
 microk8s kubectl rollout restart deployment/central-director
-microk8s kubectl rollout restart deployment/emergency-brake
 
 # Restart vehicle-specific deployments
 jq -c '.[]' vehicles.json | while read -r record; do
@@ -155,6 +158,7 @@ jq -c '.[]' vehicles.json | while read -r record; do
     VIN_LOWER=${VIN,,}
     microk8s kubectl rollout restart deployment/location-sender-"$VIN_LOWER"
     microk8s kubectl rollout restart deployment/distance-monitor-"$VIN_LOWER" 2>/dev/null || true
+    microk8s kubectl rollout restart deployment/emergency-brake-"$VIN_LOWER"
 done
 
 echo "==================== SETTING UP PORT FORWARDS ===================="
@@ -162,7 +166,6 @@ echo "==================== SETTING UP PORT FORWARDS ===================="
 microk8s kubectl port-forward svc/loki-grafana -n monitoring 3000:80 &
 
 # Setup port forwarding for Visor (if using LoadBalancer)
-sleep 10
 microk8s kubectl port-forward svc/visor-service 8080:80 &
 
 echo "==================== DEPLOYMENT COMPLETE ===================="

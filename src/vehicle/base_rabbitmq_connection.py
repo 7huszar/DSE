@@ -1,26 +1,28 @@
+import json
+import queue
 import threading
 import time
 import pika
 import os
-import json
 import logging
-import queue
-from flask import Flask, request, jsonify
 from pika.exceptions import AMQPConnectionError, AMQPChannelError
 
 
 class BaseRabbitMqConnection:
 
-    def __init__(self):
+    def __init__(self, run_retry_queue: bool):
         self.connection = None
         self.channel = None
         self.connection_dead = threading.Condition()
+        self.retry_queue = queue.Queue()
 
         self.RABBITMQ_USER = os.environ['RABBITMQ_USER']
         self.RABBITMQ_PWD = os.environ['RABBITMQ_PASSWORD']
         self.RABBITMQ_PORT = int(os.environ.get('RABBITMQ_PORT', 5672))
         self.RABBITMQ_HOST = os.environ.get("RABBITMQ_HOST", "rabbitmq")
         self.RETRY_WAIT = int(os.getenv("RETRY_WAIT", 5))
+
+        self.run_retry_queue: bool = run_retry_queue
 
         self.credentials = pika.PlainCredentials(
             username=self.RABBITMQ_USER,
@@ -86,9 +88,42 @@ class BaseRabbitMqConnection:
             self.establish_connection()
             self.open_channel()
 
+    def get_retry_routing_key(self):
+        raise NotImplementedError("Subclass must implement get_retry_routing_key")
+
+
+    def process_failed_msg(self):
+        while True:
+            with self.retry_queue.not_empty:
+                while self.retry_queue.empty():
+                    self.retry_queue.not_empty.wait()
+            if self.channel.is_closed or self.connection.is_closed:
+                with self.connection_dead:
+                    self.connection_dead.notify_all()
+                time.sleep(self.RETRY_WAIT)
+                continue
+            self.logger.info("Try to resend all failed msg.")
+            while not self.retry_queue.empty():
+                pkg = self.retry_queue.get()
+                try:
+                    self.channel.basic_publish(
+                        exchange='broker',
+                        routing_key=self.get_retry_routing_key(),
+                        body=json.dumps(pkg).encode("utf-8")
+                    )
+                except (AMQPChannelError, AMQPConnectionError) as e:
+                    self.logger.warning(f"Failed to resend msg: {repr(e)}")
+                    with self.connection_dead:
+                        self.connection_dead.notify_all()
+                    self.retry_queue.put(pkg)
+                    break
+
     def run(self):
         self.establish_connection()
         self.open_channel()
+
+        if self.run_retry_queue:
+            threading.Thread(target=self.process_failed_msg, daemon=True).start()
 
     def get_env_variables(self):
         return (f"RABBITMQ_USER: {self.RABBITMQ_USER}, "
