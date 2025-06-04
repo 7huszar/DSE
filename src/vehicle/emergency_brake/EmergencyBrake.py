@@ -2,7 +2,8 @@ import os
 
 from src.vehicle.base_rabbitmq_connection import BaseRabbitMqConnection
 
-from flask import Flask, requests
+from flask import Flask
+import requests
 
 class EmergencyBrake(BaseRabbitMqConnection):
 

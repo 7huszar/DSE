@@ -15,8 +15,6 @@ spec:
       containers:
         - name: central-director
           image: localhost:32000/central-director:latest
-          ports:
-            - containerPort: 5000
           env:
             - name: RABBITMQ_USER
               valueFrom:
@@ -28,13 +26,7 @@ spec:
                 secretKeyRef:
                   name: rabbitmq-default-user
                   key: password
-            - name: CD_DB_HOST
-              value: "cd-postgres"
-            - name: CD_DB_PORT
-              value: "5432"
-            - name: CD_DB_NAME
-              value: "cd_db"
-            - name: CD_DB_USER
-              value: "admin"
-            - name: CD_DB_PASSWORD
-              value: "admin"
+            - name: RABBITMQ_HOST
+              value: "rabbitmq"
+            - name: RABBITMQ_PORT
+              value: "5672"

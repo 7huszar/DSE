@@ -2,14 +2,18 @@ import time
 import pika
 import os
 import json
-import psycopg2
 import logging
 from datetime import datetime
 from pika.exceptions import AMQPConnectionError
+from collections import defaultdict
 
 ### CONSTANTS START ###
 RETRY_WAIT = 5
-CRITICAL_DISTANCE_THRESHOLD = 0.5  # meters
+# Emergency brake conditions
+CONDITION_1_DISTANCE = 20  # meters
+CONDITION_1_RATE = 3       # m/s (decreasing)
+CONDITION_2_DISTANCE = 40  # meters
+CONDITION_2_RATE = 5       # m/s (decreasing)
 ### CONSTANTS END ###
 
 logging.basicConfig(
@@ -18,103 +22,147 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Database connection
-def get_db_connection():
-    """Connect to the Central Director database"""
-    return psycopg2.connect(
-        host=os.environ.get('CD_DB_HOST', 'cd-postgres'),
-        port=os.environ.get('CD_DB_PORT', 5432),
-        database=os.environ.get('CD_DB_NAME', 'cd_db'),
-        user=os.environ.get('CD_DB_USER', 'admin'),
-        password=os.environ.get('CD_DB_PASSWORD', 'admin')
-    )
-
-# Create events table if not exists
-def init_database():
-    """Initialize the database with events table"""
-    conn = get_db_connection()
-    cur = conn.cursor()
-    cur.execute("""
-                CREATE TABLE IF NOT EXISTS events (
-                                                      id SERIAL PRIMARY KEY,
-                                                      time TIMESTAMP NOT NULL,
-                                                      event VARCHAR(255) NOT NULL,
-                    details JSONB
-                    )
-                """)
-    conn.commit()
-    cur.close()
-    conn.close()
-    logger.info("Database initialized")
+# In-memory storage for events and vehicle data
+events_log = []
+vehicle_distances = defaultdict(lambda: {'front': None, 'back': None, 'front_rate': 0, 'back_rate': 0})
 
 # RabbitMQ connection
 credentials = pika.PlainCredentials(
-    username=os.environ['RABBITMQ_USER'],
-    password=os.environ['RABBITMQ_PASSWORD']
+    username=os.environ.get('RABBITMQ_USER', 'guest'),
+    password=os.environ.get('RABBITMQ_PASSWORD', 'guest')
 )
 
 def get_rabbitmq_connection():
     return pika.BlockingConnection(
         pika.ConnectionParameters(
-            host='rabbitmq',
+            host=os.environ.get('RABBITMQ_HOST', 'rabbitmq'),
             port=int(os.environ.get('RABBITMQ_PORT', 5672)),
-            credentials=credentials
+            credentials=credentials,
+            heartbeat=600,
+            blocked_connection_timeout=300
         )
     )
 
-# Store event in database
 def store_event(event_type, details=None):
-    """Store an event in the database"""
-    conn = get_db_connection()
-    cur = conn.cursor()
-    cur.execute(
-        "INSERT INTO events (time, event, details) VALUES (%s, %s, %s)",
-        (datetime.now(), event_type, json.dumps(details) if details else None)
-    )
-    conn.commit()
-    cur.close()
-    conn.close()
-    logger.info(f"Stored event: {event_type}")
+    """Store an event in memory"""
+    event = {
+        'time': datetime.now().isoformat(),
+        'event': event_type,
+        'details': details
+    }
+    events_log.append(event)
 
-# Callback for distance messages
+    # Keep only last 1000 events
+    if len(events_log) > 1000:
+        events_log.pop(0)
+
+    logger.info(f"Stored event: {event_type} - {details}")
+
+def check_emergency_conditions(vin, distance, change_rate, direction='front'):
+    """Check if emergency brake conditions are met"""
+    if direction != 'front':
+        return False
+
+    # Check conditions (negative change_rate means decreasing distance)
+    if distance < CONDITION_1_DISTANCE and change_rate < -CONDITION_1_RATE:
+        logger.warning(f"EMERGENCY CONDITION 1: Vehicle {vin} - distance={distance}m, rate={change_rate}m/s")
+        return True
+
+    if distance < CONDITION_2_DISTANCE and change_rate < -CONDITION_2_RATE:
+        logger.warning(f"EMERGENCY CONDITION 2: Vehicle {vin} - distance={distance}m, rate={change_rate}m/s")
+        return True
+
+    return False
+
+def send_emergency_brake(channel, vin, reason, distance, change_rate):
+    """Send emergency brake command"""
+    command = {
+        'vin': vin,
+        'command': 'emergency_stop',
+        'reason': reason,
+        'distance': distance,
+        'change_rate': change_rate,
+        'timestamp': time.time()
+    }
+
+    # Send to emergency brake service
+    channel.basic_publish(
+        exchange='broker',
+        routing_key='vehicle.emergency.brake',
+        body=json.dumps(command).encode('utf-8')
+    )
+
+    # Also send to passenger service for frontend notification
+    channel.basic_publish(
+        exchange='broker',
+        routing_key='backend.location.passenger',
+        body=json.dumps({
+            'vin': vin,
+            'emergencyBrake': True,
+            'reason': reason
+        }).encode('utf-8')
+    )
+
+    logger.info(f"Emergency brake command sent for {vin}!")
+
 def distance_callback(ch, method, properties, body):
     """Process distance messages from Distance Monitor"""
     try:
-        distance = float(body.decode('utf-8'))
+        data = json.loads(body.decode('utf-8'))
         routing_key = method.routing_key
 
-        # Check if it's front distance
+        vin = data.get('vin')
+        distance = float(data.get('distance'))
+        change_rate = float(data.get('change_rate', 0))
+
+        # Determine direction from routing key
         if 'distance.front' in routing_key:
-            logger.info(f"Received front distance: {distance}m")
+            direction = 'front'
+            vehicle_distances[vin]['front'] = distance
+            vehicle_distances[vin]['front_rate'] = change_rate
+            logger.info(f"Received front distance for {vin}: {distance}m (rate: {change_rate}m/s)")
+        elif 'distance.back' in routing_key:
+            direction = 'back'
+            vehicle_distances[vin]['back'] = distance
+            vehicle_distances[vin]['back_rate'] = change_rate
+            logger.info(f"Received back distance for {vin}: {distance}m (rate: {change_rate}m/s)")
+        else:
+            return
 
-            # Check if distance is critical
-            if distance < CRITICAL_DISTANCE_THRESHOLD:
-                logger.warning(f"CRITICAL: Front distance {distance}m is below threshold!")
+        # Check emergency conditions for front distance
+        if direction == 'front' and check_emergency_conditions(vin, distance, change_rate, direction):
+            reason = f"Critical front distance: {distance:.1f}m, approaching at {abs(change_rate):.1f}m/s"
 
-                # Store event in database
-                store_event("emergency_brake_triggered", {
-                    "distance_front": distance,
-                    "threshold": CRITICAL_DISTANCE_THRESHOLD,
-                    "trigger_time": datetime.now().isoformat()
-                })
+            # Store event
+            store_event("emergency_brake_triggered", {
+                'vin': vin,
+                'distance_front': distance,
+                'change_rate': change_rate,
+                'conditions': f"distance < threshold AND decreasing rapidly",
+                'trigger_time': datetime.now().isoformat()
+            })
 
-                # Send emergency brake command
-                channel.basic_publish(
-                    exchange='broker',
-                    routing_key='vehicle.emergency.brake',
-                    body=json.dumps({
-                        "command": "emergency_stop",
-                        "reason": "front_distance_critical",
-                        "distance": distance
-                    }).encode('utf-8')
-                )
-                logger.info("Emergency brake command sent!")
+            # Send emergency brake command
+            send_emergency_brake(ch, vin, reason, distance, change_rate)
 
     except Exception as e:
         logger.error(f"Error processing distance message: {e}")
 
-# Initialize database
-init_database()
+def location_callback(ch, method, properties, body):
+    """Process location messages from Location Tracker"""
+    try:
+        data = json.loads(body.decode('utf-8'))
+        vin = data.get('vin')
+        lat = data.get('lat')
+        long = data.get('long')
+
+        logger.debug(f"Location update for {vin}: ({lat}, {long})")
+
+        # Here you could implement distance calculation between vehicles
+        # For now, we rely on the Distance Monitor data
+
+    except Exception as e:
+        logger.error(f"Error processing location message: {e}")
 
 # Setup RabbitMQ connection
 not_succeeded = True
@@ -124,27 +172,34 @@ while not_succeeded:
         connection = get_rabbitmq_connection()
         not_succeeded = False
     except AMQPConnectionError as e:
-        logger.warning(f"Failed to establish connection: {repr(e)}. Retrying in {RETRY_WAIT} seconds.")
+        logger.warning(f"Failed to connect: {repr(e)}. Retrying in {RETRY_WAIT} seconds.")
         time.sleep(RETRY_WAIT)
 
 logger.info("Successfully connected to RabbitMQ")
 channel = connection.channel()
-channel.exchange_declare(exchange='broker', exchange_type='topic')
+channel.exchange_declare(exchange='broker', exchange_type='topic', durable=True)
 
-# Create queue for distance monitoring
-result = channel.queue_declare(queue='central_director_queue', exclusive=False)
-queue_name = result.method.queue
+# Create queues
+distance_queue = channel.queue_declare(queue='central_director_distance_queue', durable=True)
+location_queue = channel.queue_declare(queue='central_director_location_queue', durable=True)
 
-# Bind to distance topics
-channel.queue_bind(exchange='broker', queue=queue_name, routing_key='backend.distance.*')
+# Bind queues to topics
+channel.queue_bind(exchange='broker', queue=distance_queue.method.queue, routing_key='backend.distance.*')
+channel.queue_bind(exchange='broker', queue=location_queue.method.queue, routing_key='backend.location.tracker')
 
-# Start consuming
-channel.basic_consume(queue=queue_name, on_message_callback=distance_callback, auto_ack=True)
+# Set up consumers
+channel.basic_consume(queue=distance_queue.method.queue, on_message_callback=distance_callback, auto_ack=True)
+channel.basic_consume(queue=location_queue.method.queue, on_message_callback=location_callback, auto_ack=True)
 
-logger.info("Central Director started. Waiting for messages...")
+logger.info("Central Director started. Monitoring vehicle distances...")
+
 try:
     channel.start_consuming()
 except KeyboardInterrupt:
     logger.info("Stopping Central Director...")
     channel.stop_consuming()
     connection.close()
+except Exception as e:
+    logger.error(f"Central Director error: {e}")
+    if connection and not connection.is_closed:
+        connection.close()
