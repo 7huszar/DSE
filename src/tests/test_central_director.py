@@ -1,5 +1,4 @@
 import unittest
-import json
 from unittest.mock import Mock, patch, MagicMock
 
 # Mock the modules
@@ -21,7 +20,7 @@ class TestCentralDirector(unittest.TestCase):
     @patch('src.vehicle.central_director.CentralDirector.db_conn')
     def test_store_event_to_db(self, mock_db):
         """Test storing events to database"""
-        from src.vehicle.central_director.CentralDirector import store_event_to_db
+        from src.backend.central_director.CentralDirector import store_event_to_db
 
         mock_db.cursor.return_value = self.mock_cursor
 
@@ -38,7 +37,7 @@ class TestCentralDirector(unittest.TestCase):
 
     def test_check_emergency_conditions_case1(self):
         """Test emergency condition 1: distance < 20m and rate > 3m/s"""
-        from src.vehicle.central_director.CentralDirector import check_emergency_conditions
+        from src.backend.central_director.CentralDirector import check_emergency_conditions
 
         result = check_emergency_conditions("TEST001", 15.0, -4.0, 'front')
         self.assertTrue(result)
