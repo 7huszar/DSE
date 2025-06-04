@@ -13,3 +13,4 @@ data:
   min_dst_back: "0.5"
   # in seconds
   sampling_time: "2"
+  scenario: "pedestrian_crossing_road"
