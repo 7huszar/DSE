@@ -1,5 +1,7 @@
 FROM python:3.9-slim
 
+WORKDIR app
+
 COPY /src/vehicle/emergency_brake/EmergencyBrake.py .
 COPY /src/vehicle/base_rabbitmq_connection.py ./src/vehicle/
 
