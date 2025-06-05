@@ -35,6 +35,15 @@ def calculate_change_rate(current_distance, last_distance, time_diff):
         return 0
     return (current_distance - last_distance) / time_diff
 
+def check_emergency_conditions(distance, change_rate):
+    """Check if emergency brake conditions are met"""
+    # Check conditions (negative change_rate means decreasing distance)
+    if distance < CONDITION_1_DISTANCE and change_rate < -CONDITION_1_RATE:
+        return True
+    if distance < CONDITION_2_DISTANCE and change_rate < -CONDITION_2_RATE:
+        return True
+    return False
+
 def vehicle_dm_callback(ch, method, properties, body):
     """Process messages from Vehicle Distance Monitor"""
     try:
@@ -59,6 +68,26 @@ def vehicle_dm_callback(ch, method, properties, body):
         vehicle['last_front_distance'] = vehicle['front_distance']
         vehicle['front_distance'] = dst_front
         vehicle['last_update_time'] = current_time
+
+        # Check emergency conditions - Backend DM can also trigger EB!
+        if check_emergency_conditions(dst_front, front_rate):
+            logger.warning(f"EMERGENCY CONDITION MET! Vehicle {vin} - distance={dst_front}m, rate={front_rate}m/s")
+
+            # Send emergency brake command directly
+            eb_command = {
+                'vin': vin,
+                'command': 'emergency_stop',
+                'reason': f"Backend DM: Critical distance {dst_front:.1f}m, rate {abs(front_rate):.1f}m/s",
+                'source': 'backend_dm',
+                'timestamp': current_time
+            }
+
+            ch.basic_publish(
+                exchange='broker',
+                routing_key=f'vehicle.{vin}.emergency.break',  # Direct to vehicle EB
+                body=json.dumps(eb_command).encode('utf-8')
+            )
+            logger.info(f"Emergency brake triggered by Backend DM for {vin}")
 
         # Forward processed data to Central Director
         cd_data = {
