@@ -130,12 +130,12 @@ class EmergencyBrake(BaseRabbitMqConnection):
 
     def shutdown(self):
         try:
-            requests.post(f"http://{self.FLASK_HOST}:{self.FLASK_PORT}/shutdown")
+            requests.post(f"http://{self.FLASK_HOST}:{self.FLASK_PORT}/shutdown", timeout=1)
         except Exception as e:
             self.logger.info(f"Flask shutdown request failed (probably normal if already shutting down): {repr(e)}")
-        
-        if self.flask_thread:
-            self.flask_thread.join(5)
+
+        if self.flask_thread and self.flask_thread.is_alive():
+            self.flask_thread.join(1)
 
         if self.consumer_channel and self.consumer_channel.is_open:
             try:
@@ -145,7 +145,7 @@ class EmergencyBrake(BaseRabbitMqConnection):
                 self.logger.warning(f"Failed to stop consumer channel: {repr(e)}")
 
         if self.consumer_thread and self.consumer_thread.is_alive():
-            self.consumer_thread.join(5)
+            self.consumer_thread.join(1)
 
         super().shutdown()
 
