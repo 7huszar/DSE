@@ -18,6 +18,7 @@ class BaseRabbitMqConnection:
         self.connection_dead = threading.Condition()
         self.shutdown_flag = threading.Event()
         self.retry_queue = queue.Queue()
+        self.SENTINEL = object()
 
         self.RABBITMQ_USER = os.environ['RABBITMQ_USER']
         self.RABBITMQ_PWD = os.environ['RABBITMQ_PASSWORD']
@@ -104,9 +105,9 @@ class BaseRabbitMqConnection:
 
     def process_failed_msg(self):
         while not self.shutdown_flag.is_set():
-            with self.retry_queue.not_empty:
-                while self.retry_queue.empty() and not self.shutdown_flag.is_set():
-                    self.retry_queue.not_empty.wait()
+
+            pkg = self.retry_queue.get()
+            self.retry_queue.put(pkg)
 
             if self.shutdown_flag.is_set():
                 return
@@ -119,6 +120,8 @@ class BaseRabbitMqConnection:
             self.logger.info("Try to resend all failed msg.")
             while not self.retry_queue.empty() and not self.shutdown_flag.is_set():
                 pkg = self.retry_queue.get()
+                if pkg is self.SENTINEL:
+                    return
                 try:
                     self.channel.basic_publish(
                         exchange='broker',
@@ -171,11 +174,13 @@ class BaseRabbitMqConnection:
         with self.connection_dead:
             self.connection_dead.notify_all()
 
-        self.reconnect_thread.join(5)
-        self.resend_thread.join(5)
+        if self.reconnect_thread and self.reconnect_thread.is_alive():
+            self.reconnect_thread.join(1)
 
-        with self.retry_queue.not_empty:
-            self.retry_queue.not_empty.notify_all()
+        self.retry_queue.put(self.SENTINEL)
+
+        if self.resend_thread and self.resend_thread.is_alive():
+            self.resend_thread.join(1)
 
         self.cleanup()
 
@@ -183,4 +188,5 @@ class BaseRabbitMqConnection:
     def handle_shutdown(self, signum, frame):
         self.logger.info(f"Received shutdown signal ({signum}), shutting down gracefully...")
         self.shutdown()
+        self.logger.info("Shutdown complete.")
         sys.exit(0)

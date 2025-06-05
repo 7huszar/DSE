@@ -30,10 +30,7 @@ class BaseSenderService(BaseRabbitMqConnection):
     def run(self):
         super().run()
 
-        threading.Thread(target=self.process_failed_msg, daemon=True).start()
-        threading.Thread(target=self.reestablish_connection, daemon=True).start()
-
-        self.app.run(host=self.FLASK_HOST, port=self.FLASK_PORT)
+        self.flask_thread.start()
 
     def flask_shutdown(self):
         func = request.environ.get('werkzeug.server.shutdown')
@@ -51,12 +48,12 @@ class BaseSenderService(BaseRabbitMqConnection):
 
     def shutdown(self):
         try:
-            requests.post(f"http://{self.FLASK_HOST}:{self.FLASK_PORT}/shutdown")
+            requests.post(f"http://{self.FLASK_HOST}:{self.FLASK_PORT}/shutdown", timeout=1)
         except Exception as e:
             self.logger.info(f"Flask shutdown request failed (probably normal if already shutting down): {repr(e)}")
 
-        if self.flask_thread:
-            self.flask_thread.join(5)
+        if self.flask_thread and self.flask_thread.is_alive():
+            self.flask_thread.join(1)
 
         super().shutdown()
 
