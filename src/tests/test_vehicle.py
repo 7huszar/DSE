@@ -1,7 +1,7 @@
 import unittest
 import time
 import math
-from vehicle import Vehicle
+from src.vehicle.data_mock.vehicle import Vehicle
 
 class TestVehicleSample(unittest.TestCase):
     """Test cases for the Vehicle.sample() method"""

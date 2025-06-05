@@ -16,14 +16,18 @@ EXCHANGE_NAME = 'broker'
 EXCHANGE_TYPE = 'topic'
 ROUTING_KEY_FOR_PASSENGER = 'backend.location.passenger'
 PASSENGER_VISOR_QUEUE_NAME = 'passenger_service_visor_updates_queue'
+CD_EVENT_LOG_ROUTING_KEY = 'cd.data.eventlog'
 
 app = Flask(__name__)
 CORS(app)
 socketio = SocketIO(app, cors_allowed_origins="*")
 
 vehicles_data_cache = {}
+event_log_cache = []
+event_log_cache_lock = threading.Lock()
 
 def rabbitmq_consumer_main_loop():
+    global event_log_cache
     while True:
         if not RABBITMQ_USER or not RABBITMQ_PASSWORD:
             print("[Passenger-RabbitMQ] CRITICAL: RABBITMQ_USER or RABBITMQ_PASSWORD not set from environment. Retrying in 10s.")
@@ -45,23 +49,45 @@ def rabbitmq_consumer_main_loop():
             channel.queue_bind(exchange=EXCHANGE_NAME, queue=PASSENGER_VISOR_QUEUE_NAME, routing_key=ROUTING_KEY_FOR_PASSENGER)
             print(f"[Passenger-RabbitMQ] Queue '{PASSENGER_VISOR_QUEUE_NAME}' bound to RKey '{ROUTING_KEY_FOR_PASSENGER}'.")
 
+            event_log_data_queue_name = 'passenger_event_log_data_queue'
+            channel.queue_declare(queue=event_log_data_queue_name, durable=True)
+            channel.queue_bind(exchange=EXCHANGE_NAME, queue=event_log_data_queue_name, routing_key=CD_EVENT_LOG_ROUTING_KEY)
+            print(f"[Passenger-RabbitMQ] Queue '{event_log_data_queue_name}' bound to RKey '{CD_EVENT_LOG_ROUTING_KEY}'.")
+
+            def cd_event_log_callback(ch, method, properties, body):
+                global event_log_cache
+                msg_str = body.decode('utf-8')
+                try:
+                    data = json.loads(msg_str)
+                    if "events" in data and isinstance(data["events"], list):
+                        with event_log_cache_lock:
+                            event_log_cache = data["events"]
+                    else:
+                        print("[Passenger] Received CD event log data in unexpected format.")
+                    ch.basic_ack(delivery_tag=method.delivery_tag)
+                except Exception as e_cb:
+                    print(f"[Passenger-RabbitMQ] Error processing CD EventLog (Tag:{method.delivery_tag}): {e_cb}. NACKing.")
+                    ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
+
             def message_processing_callback(ch, method, properties, body):
-                msg_str = body.decode()
-                print(f"[Passenger-RabbitMQ] Received (Tag:{method.delivery_tag}, RKey:{method.routing_key}): {msg_str[:100]}...") # Log only first 100 chars
+                msg_str = body.decode('utf-8')
                 try:
                     data = json.loads(msg_str)
                     vin = data.get('vin')
                     if vin:
-                        vehicles_data_cache[vin] = data
-                        socketio.emit('vehicle_update', data) # Emit full data object
-                        # print(f"[Passenger-SocketIO] Emitted 'vehicle_update' for VIN {vin}.") # Can be verbose
+                        current_vehicle_data = vehicles_data_cache.get(vin, {})
+                        current_vehicle_data.update(data)
+                        vehicles_data_cache[vin] = current_vehicle_data
+                        socketio.emit('vehicle_update', current_vehicle_data)
                     ch.basic_ack(delivery_tag=method.delivery_tag)
                 except Exception as e:
                     print(f"[Passenger-RabbitMQ] Error processing message (Tag:{method.delivery_tag}): {e}. NACKing.")
                     ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
 
             channel.basic_consume(queue=PASSENGER_VISOR_QUEUE_NAME, on_message_callback=message_processing_callback, auto_ack=False)
-            print(f"[Passenger-RabbitMQ] Waiting for messages in Queue '{PASSENGER_VISOR_QUEUE_NAME}'.")
+            channel.basic_consume(queue=event_log_data_queue_name, on_message_callback=cd_event_log_callback, auto_ack=False)
+
+            print(f"[Passenger-RabbitMQ] Waiting for messages on all subscribed queues...")
             channel.start_consuming()
 
         except pika.exceptions.AMQPConnectionError as e:
@@ -83,6 +109,46 @@ def get_specific_vehicle_api(vin):
         return jsonify(vehicle)
     return jsonify({"error": f"Vehicle VIN {vin} not found"}), 404
 
+@app.route('/api/events', methods=['GET'])
+def get_events_from_passenger_cache():
+    vin_filter = request.args.get('vin')
+    with event_log_cache_lock:
+        current_events_copy = list(event_log_cache)
+    if vin_filter:
+        filtered_events = [event for event in current_events_copy if event.get('vin') == vin_filter]
+        return jsonify(filtered_events), 200
+    else:
+        return jsonify(current_events_copy), 200
+
+@app.route('/emergency-brake', methods=['POST'])
+def trigger_emergency_brake():
+    data = request.get_json()
+    vin = data.get('vin')
+    source = data.get('source', 'Unknown')
+    if not vin:
+        return jsonify({"error": "VIN is required"}), 400
+    try:
+        temp_credentials = pika.PlainCredentials(RABBITMQ_USER, RABBITMQ_PASSWORD)
+        temp_connection = pika.BlockingConnection(pika.ConnectionParameters(
+            host=RABBITMQ_HOST, port=RABBITMQ_PORT, credentials=temp_credentials
+        ))
+        temp_channel = temp_connection.channel()
+        message = {
+            'vin': vin,
+            'source': source,
+            'timestamp': time.time()
+        }
+        temp_channel.basic_publish(
+            exchange=EXCHANGE_NAME,
+            routing_key='backend.emergency.request',
+            body=json.dumps(message).encode('utf-8')
+        )
+        temp_connection.close()
+        return jsonify({"status": "Emergency brake request sent", "vin": vin}), 200
+    except Exception as e:
+        print(f"[Passenger] Error sending emergency brake request: {e}")
+        return jsonify({"error": "Failed to send emergency brake request"}), 500
+
 @socketio.on('connect')
 def handle_socketio_client_connect():
     print(f"[Passenger-SocketIO] Client connected (SID: {request.sid})")
@@ -94,8 +160,7 @@ def handle_socketio_client_disconnect():
 
 if __name__ == '__main__':
     print("[Passenger] Initializing Passenger Service...")
-    consumer_thread = threading.Thread(target=rabbitmq_consumer_main_loop, name="RabbitMQConsumerThread")
-    consumer_thread.daemon = True
+    consumer_thread = threading.Thread(target=rabbitmq_consumer_main_loop, name="RabbitMQConsumerThread", daemon=True)
     consumer_thread.start()
     print("[Passenger] RabbitMQ Consumer Thread started.")
     print(f"[Passenger] Starting Flask-SocketIO server on http://0.0.0.0:8080 ...")

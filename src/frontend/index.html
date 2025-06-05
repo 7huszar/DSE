@@ -198,6 +198,40 @@
             font-weight: 600;
             white-space: nowrap;
         }
+        .distance-highlight {
+            background: #e3f2fd;
+            padding: 0.5rem;
+            border-radius: 4px;
+            margin-top: 0.5rem;
+            text-align: center;
+        }
+
+        .distance-highlight .distance-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #1976d2;
+        }
+
+        .emergency-button {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            margin-top: 0.5rem;
+            border-radius: 4px;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            transition: background 0.2s;
+        }
+
+        .emergency-button:hover {
+            background: #c82333;
+        }
+
+        .emergency-button:active {
+            transform: scale(0.98);
+        }
     </style>
 </head>
 <body>
@@ -240,7 +274,14 @@
                             <span class="info-label">Rear Distance</span>
                             <span class="info-value">{{ vehicle.rearDistance || '-' }} m</span>
                         </div>
+                        <div class="distance-highlight" v-if="vehicle.frontDistance">
+                            <div class="info-label">Front Distance</div>
+                            <div class="distance-value">{{ vehicle.frontDistance }} m</div>
+                        </div>
                     </div>
+                    <button class="emergency-button" @click="triggerEmergencyBrake(vehicle.vin)">
+                        🚨 Trigger Emergency Brake
+                    </button>
                     <div v-if="vehicle.emergencyBrake" class="emergency-indicator">
                         ⚠️ EMERGENCY BRAKE ACTIVE
                     </div>
@@ -459,7 +500,32 @@
                     return '-';
                 }
                 return `${location.lat.toFixed(5)}, ${location.lng.toFixed(5)}`;
+            },
+
+            async triggerEmergencyBrake(vin) {
+                try {
+                    const response = await fetch(this.apiUrl + '/emergency-brake', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ vin: vin, source: 'Visor' })
+                    });
+
+                    if (response.ok) {
+                        this.addEvent(`Emergency brake requested for ${vin}`);
+                        alert('Emergency brake command sent successfully!');
+                    } else {
+                        console.error('Failed to trigger emergency brake');
+                        alert('Failed to trigger emergency brake');
+                    }
+                } catch (error) {
+                    console.error('Error triggering emergency brake:', error);
+                    alert('Error triggering emergency brake');
+                }
             }
+
+
         }
     });
 </script>
