@@ -25,12 +25,23 @@ class EmergencyBrake(BaseRabbitMqConnection):
         self.FLASK_HOST: str = os.environ.get("FLASK_HOST", "0.0.0.0")
         self.FLASK_PORT: int = int(os.environ.get("FLASK_PORT", 5000))
 
+        self.consumer_connection = None
+        self.consumer_channel = None
+
         self.app.add_url_rule("/trigger", view_func=self.brake, methods=["POST"])
 
         super().run()
         self.channel.exchange_declare(exchange='broker', exchange_type='topic', durable=True)
         result = self.channel.queue_declare('', exclusive=False)
         self.queue_name: str = result.method.queue
+
+        self.app.add_url_rule('/shutdown', 'flask_shutdown', self.flask_shutdown, methods=['POST'])
+
+        self.flask_thread = threading.Thread(target=self.run_flask, daemon=False)
+        self.consumer_thread = threading.Thread(target=self.consume, daemon=False)
+
+    def run_flask(self):
+        self.app.run(host=self.FLASK_HOST, port=self.FLASK_PORT)
 
 
     def brake(self):
@@ -83,29 +94,61 @@ class EmergencyBrake(BaseRabbitMqConnection):
         super().run()
 
         self.channel.queue_bind(exchange='broker', queue=self.queue_name, routing_key='vehicle.emergency_break')
-        threading.Thread(target=self.consume, daemon=True).start()
-        self.app.run(host=self.FLASK_HOST, port=self.FLASK_PORT)
+        self.consumer_thread.start()
+        self.flask_thread.start()
 
     def callback(self, ch, method, properties, body):
         self.logger.info(f"Requested emergency brake by async rabbitmq for {self.vin}")
         self.trigger_brake(json.loads(body.decode("utf-8")).get("time"))
 
     def consume(self):
-        local_connection = self.get_rabbitmq_connection()
-        local_channel = local_connection.channel()
+        self.consumer_connection = self.get_rabbitmq_connection()
+        self.consumer_channel = self.consumer_connection.channel()
 
-        local_channel.queue_bind(exchange='broker', queue=self.queue_name, routing_key='vehicle.emergency_break')
+        self.consumer_channel.queue_bind(exchange='broker', queue=self.queue_name, routing_key='vehicle.emergency_break')
 
-        local_channel.basic_consume(queue=self.queue_name, on_message_callback=self.callback, auto_ack=True)
+        self.consumer_channel.basic_consume(queue=self.queue_name, on_message_callback=self.callback, auto_ack=True)
 
         self.logger.info("Started RabbitMQ consumer thread.")
         try:
-            local_channel.start_consuming()
+            self.consumer_channel.start_consuming()
         except Exception as e:
             self.logger.error(f"Consumer stopped due to exception: {repr(e)}")
         finally:
-            if not local_connection.is_closed:
-                local_connection.close()
+            if self.consumer_channel and not self.consumer_channel.is_closed:
+                self.consumer_channel.close()
+            if self.consumer_connection and not self.consumer_connection.is_closed:
+                self.consumer_connection.close()
+
+    def flask_shutdown(self):
+        func = request.environ.get('werkzeug.server.shutdown')
+        if func is None:
+            raise RuntimeError('Not running with the Werkzeug Server')
+        func()
+        return 'Server shutting down...', 200
+
+
+    def shutdown(self):
+        try:
+            requests.post(f"http://{self.FLASK_HOST}:{self.FLASK_PORT}/shutdown")
+        except Exception as e:
+            self.logger.info(f"Flask shutdown request failed (probably normal if already shutting down): {repr(e)}")
+        
+        if self.flask_thread:
+            self.flask_thread.join(5)
+
+        if self.consumer_channel and self.consumer_channel.is_open:
+            try:
+                self.logger.info("Stopping consumer channel...")
+                self.consumer_channel.stop_consuming()
+            except Exception as e:
+                self.logger.warning(f"Failed to stop consumer channel: {repr(e)}")
+
+        if self.consumer_thread and self.consumer_thread.is_alive():
+            self.consumer_thread.join(5)
+
+        super().shutdown()
+
 
 if __name__ == "__main__":
     service = EmergencyBrake()
