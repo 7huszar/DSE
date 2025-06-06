@@ -5,6 +5,7 @@ metadata:
 spec:
   selector:
     app: emergency-brake
+    vin: ${VIN_LOWER}
   ports:
     - protocol: TCP
       port: 80

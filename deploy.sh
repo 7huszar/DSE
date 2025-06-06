@@ -184,4 +184,4 @@ echo ""
 echo ">>> Port-forwarding for Visor is now active in this terminal."
 echo ">>> Press CTRL+C to stop."
 echo ""
-microk8s kubectl port-forward svc/visor-service 8080:80
+microk8s kubectl port-forward svc/visor-service 8080:80 &

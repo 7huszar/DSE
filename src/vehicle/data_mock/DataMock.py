@@ -76,7 +76,8 @@ for vehicle in vehicles:
 @app.route("/brake/<vin>", methods=["POST"])
 def trigger_break(vin: str):
     logger.info(f"Emergency break triggered for {vin}")
-    vehicles.get(vin).sample(acceleration=BRAKE_DECELERATION)
+    vehicles.get(vin).velocity = 0.0
+    vehicles[vin].acceleration = 0.0
     return jsonify({"vin": vin, "time": time.time()}), 200
 
 def send_data(addr: str, data):
@@ -106,7 +107,7 @@ def update_car(vehicle):
     data_loc = {
             "vin": vehicle.vin,
             "lat": float(new_coord["lat"]),
-            "long": float(new_coord["long"]),
+            "lon": float(new_coord["lon"]),
             "time": float(new_coord["internal_time"]),
             "speed": vehicle.velocity * 3.6
     }
@@ -127,6 +128,7 @@ def update_car(vehicle):
     send_data(addr_mon, data_mon)
 
 threading.Thread(target=app.run, kwargs={"host": "0.0.0.0", "port": 5000}, daemon=True).start()
+time.sleep(5)
 while True:
     for vehicle in vehicles.values():
         update_car(vehicle)
