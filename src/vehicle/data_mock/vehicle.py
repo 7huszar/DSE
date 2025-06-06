@@ -68,7 +68,7 @@ class Vehicle:
             self.latitude = geo["lat2"]
             self.longitude = geo["lon2"]
 
-        return {"lat": self.latitude, "long": self.longitude, "internal_time": self.internal_time}
+        return {"lat": self.latitude, "lon": self.longitude, "internal_time": self.internal_time}
 
     # ------------------------------------------------------------------
     def __str__(self) -> str:
