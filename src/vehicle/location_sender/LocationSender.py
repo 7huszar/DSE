@@ -11,9 +11,17 @@ class LocationSenderService(BaseSenderService):
         self.logger.info(f"Received data: {str(data)}")
 
         try:
+            #Publish to backend location tracker
             self.channel.basic_publish(
                 exchange='broker',
                 routing_key='backend.location.tracker',
+                body=json.dumps(data).encode("utf-8")
+            )
+
+            #Publish to frontend visor
+            self.channel.basic_publish(
+                exchange='broker',
+                routing_key='visor.location',
                 body=json.dumps(data).encode("utf-8")
             )
 
