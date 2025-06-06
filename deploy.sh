@@ -20,7 +20,6 @@ microk8s enable dashboard
 microk8s enable registry
 microk8s enable dns
 microk8s enable storage
-microk8s enable metallb
 
 echo "==================== APPLYING PLUGINS ===================="
 microk8s kubectl apply -f "https://github.com/rabbitmq/cluster-operator/releases/latest/download/cluster-operator.yml"
@@ -151,6 +150,7 @@ microk8s kubectl apply -f ./src/broker/service.yaml
 echo "==================== RESTARTING DEPLOYMENTS ===================="
 # Restart all deployments to ensure latest images
 microk8s kubectl rollout restart deployment/location-tracker
+microk8s kubectl rollout restart deployment/backend-distance-monitor
 microk8s kubectl rollout restart deployment/data-mock
 microk8s kubectl rollout restart deployment/passenger
 microk8s kubectl rollout restart deployment/visor
