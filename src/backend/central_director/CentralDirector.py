@@ -83,14 +83,22 @@ def store_event(vin, event_type, source=None, details=None):
 
 def check_emergency_conditions(vin, dm_distance, change_rate, lt_distance=None):
     reasons = []
+
+    decreasing_rate = -change_rate
+
     if dm_distance is not None:
-        if dm_distance < CONDITION_1_DISTANCE and change_rate < -CONDITION_1_RATE:
-            reasons.append(f"Condition 1: distance={dm_distance}m < 20m, rate={abs(change_rate)}m/s > 3m/s")
-        if dm_distance < CONDITION_2_DISTANCE and change_rate < -CONDITION_2_RATE:
-            reasons.append(f"Condition 2: distance={dm_distance}m < 40m, rate={abs(change_rate)}m/s > 5m/s")
+        # Condition 1
+        if dm_distance < CONDITION_1_DISTANCE and decreasing_rate > CONDITION_1_RATE:
+            reasons.append(f"Condition 1: distance={dm_distance:.2f}m < 20m and approach_rate={decreasing_rate:.2f}m/s > 3m/s")
+        # Condition 2
+        if dm_distance < CONDITION_2_DISTANCE and decreasing_rate > CONDITION_2_RATE:
+            reasons.append(f"Condition 2: distance={dm_distance:.2f}m < 40m and approach_rate={decreasing_rate:.2f}m/s > 5m/s")
+        # Condition 3
         if lt_distance is not None and abs(dm_distance - lt_distance) > CONDITION_3_DEVIATION:
-            reasons.append(f"Condition 3: |DM({dm_distance}m) - LT({lt_distance}m)| = {abs(dm_distance - lt_distance)}m > 20m")
-    return reasons
+            reasons.append(f"Condition 3: Plausibility failed. |DM({dm_distance:.2f}m) - LT({lt_distance:.2f}m)| = {abs(dm_distance - lt_distance):.2f}m > 20m")
+
+    # Deduplicate reasons if multiple conditions apply
+    return list(dict.fromkeys(reasons))
 
 @app.route('/health', methods=['GET'])
 def health():

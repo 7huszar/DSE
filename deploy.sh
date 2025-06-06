@@ -4,12 +4,10 @@ echo "==================== STEEER DEPLOYMENT SCRIPT ===================="
 echo "Starting deployment at $(date)"
 
 echo "==================== RUNNING TESTS ===================="
-cd ./src/tests/
- python3 -m pytest test_vehicle.py test_distance_monitor.py test_central_director.py -v || {
+python3 -m pytest src/tests/ -v || {
     echo "ERROR: Tests failed! Aborting deployment."
     exit 1
 }
-cd ../../
 echo "Tests passed! Continuing with deployment..."
 
 echo "==================== ENABLING PLUGINS ===================="
@@ -36,7 +34,6 @@ microk8s helm3 install loki grafana/loki-stack \
   -n monitoring
 
 echo "==================== BUILDING DOCKER IMAGES ===================="
-# Build all images
 docker build -t localhost:32000/location-tracker:latest ./src/backend/location_tracker/
 docker build -t localhost:32000/location-sender:latest -f ./src/vehicle/location_sender/Dockerfile .
 docker build -t localhost:32000/data-mock:latest -f ./src/vehicle/data_mock/Dockerfile .
@@ -59,21 +56,22 @@ docker push localhost:32000/central-director:latest
 docker push localhost:32000/backend-distance-monitor:latest
 
 echo "==================== APPLYING CONFIGURATIONS ===================="
-# Apply config maps
+microk8s kubectl apply -f ./configuration/data_mock_config.yaml
 microk8s kubectl apply -f ./src/backend/rabbit_mq/rabbitmq-configmap.yaml
 microk8s kubectl apply -f ./src/backend/location_tracker/location-tracker-configmap.yaml
 
 echo "==================== DEPLOYING DATABASES ===================="
-# Deploy PostgreSQL databases
-microk8s kubectl apply -f ./src/backend/db/location_tracker_db/lt-postgres-configmap.yaml
-microk8s kubectl apply -f ./src/backend/db/location_tracker_db/lt-postgres-pv-claim.yaml
+# Location Tracker DB
 microk8s kubectl apply -f ./src/backend/db/location_tracker_db/lt-psql-persistant-volume.yaml
+microk8s kubectl apply -f ./src/backend/db/location_tracker_db/lt-postgres-pv-claim.yaml
+microk8s kubectl apply -f ./src/backend/db/location_tracker_db/lt-postgres-configmap.yaml
 microk8s kubectl apply -f ./src/backend/db/location_tracker_db/lt-ps-deployment.yaml
 microk8s kubectl apply -f ./src/backend/db/location_tracker_db/lt-ps-service.yaml
 
-microk8s kubectl apply -f ./src/backend/db/central_director_db/cd-postgres-configmap.yaml
-microk8s kubectl apply -f ./src/backend/db/central_director_db/cd-postgres-pv-claim.yaml
+# Central Director DB
 microk8s kubectl apply -f ./src/backend/db/central_director_db/cd-psql-persistant-volume.yaml
+microk8s kubectl apply -f ./src/backend/db/central_director_db/cd-postgres-pv-claim.yaml
+microk8s kubectl apply -f ./src/backend/db/central_director_db/cd-postgres-configmap.yaml
 microk8s kubectl apply -f ./src/backend/db/central_director_db/cd-ps-deployment.yaml
 microk8s kubectl apply -f ./src/backend/db/central_director_db/cd-ps-service.yaml
 
