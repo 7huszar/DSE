@@ -164,26 +164,24 @@ jq -c '.[]' vehicles.json | while read -r record; do
     microk8s kubectl rollout restart deployment/emergency-brake-"$VIN_LOWER"
 done
 
+echo "==================== WAITING FOR DEPLOYMENTS TO BE READY ===================="
+# Wait for the visor deployment to have at least one replica available.
+echo "Waiting for Visor service to be ready..."
+microk8s kubectl wait --for=condition=available --timeout=300s deployment/visor
+
 echo "==================== SETTING UP PORT FORWARDS ===================="
-# Setup port forwarding for Grafana
+# Setup port forwarding for Grafana in the background
 microk8s kubectl port-forward svc/loki-grafana -n monitoring 3000:80 &
 
-# Setup port forwarding for Visor (if using LoadBalancer)
-microk8s kubectl port-forward svc/visor-service 8080:80 &
-
+# The final command will run in the foreground, keeping the script and the connection alive.
 echo "==================== DEPLOYMENT COMPLETE ===================="
-echo "Deployment completed at $(date)"
 echo ""
 echo "Access points:"
 echo "- Visor (Frontend): http://localhost:8080"
 echo "- Grafana: http://localhost:3000"
-echo "  Username: admin"
-echo -n "  Password: "
-kubectl get secret -n monitoring loki-grafana -o jsonpath="{.data.admin-password}" | base64 --decode
+echo "  (Use a separate terminal to get the Grafana password if needed via 'kubectl get secret ...')"
 echo ""
+echo ">>> Port-forwarding for Visor is now active in this terminal."
+echo ">>> Press CTRL+C to stop."
 echo ""
-echo "To check deployment status:"
-echo "  microk8s kubectl get pods --all-namespaces"
-echo ""
-echo "To view logs:"
-echo "  microk8s kubectl logs -f deployment/[deployment-name]"
+microk8s kubectl port-forward svc/visor-service 8080:80
