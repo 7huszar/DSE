@@ -3,7 +3,7 @@ import json
 import logging
 import psycopg2
 import psycopg2.extras
-from datetime import datetime
+from datetime import datetime, timezone
 from flask import Flask, request, jsonify
 import threading
 import time
@@ -89,9 +89,9 @@ def store_event(vin, event_type, source=None, details=None):
         conn = get_db_connection()
         cur = conn.cursor()
         cur.execute("""
-            INSERT INTO emergency_events (vin, timestamp, event_type, source, details)
-            VALUES (%s, %s, %s, %s, %s)
-        """, (vin, datetime.now(datetime.timezone.utc), event_type, source, json.dumps(details) if details else None))
+    INSERT INTO emergency_events (vin, timestamp, event_type, source, details)
+    VALUES (%s, %s, %s, %s, %s)
+""", (vin, datetime.now(timezone.utc), event_type, source, json.dumps(details) if details else None))
         conn.commit()
         cur.close()
         conn.close()
