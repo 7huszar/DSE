@@ -1,6 +1,9 @@
 import unittest
 import time
 import math
+import sys
+import os
+
 from src.vehicle.data_mock.vehicle import Vehicle
 
 class TestVehicleSample(unittest.TestCase):
@@ -143,8 +146,4 @@ def run_tests():
     return result.wasSuccessful()
 
 if __name__ == '__main__':
-    # Run tests
-    success = run_tests()
-
-    # Exit with appropriate code
-    exit(0 if success else 1)
+    unittest.main()

@@ -1,28 +1,23 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: distance-monitor-${VIN_LOWER}
+  name: backend-distance-monitor-${VIN_LOWER}
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: distance-monitor
+      app: backend-distance-monitor-${VIN_LOWER}
   template:
     metadata:
       labels:
-        app: distance-monitor
+        app: backend-distance-monitor-${VIN_LOWER}
     spec:
       containers:
-        - name: distance-monitor
-          image: localhost:32000/distance-monitor:latest
-          ports:
-            - containerPort: 5000
-          envFrom:
-            - configMapRef:
-                name: rabbit-mq-configmap
-            - configMapRef:
-                name: distance-monitor-config
+        - name: backend-distance-monitor
+          image: localhost:32000/backend-distance-monitor:latest
           env:
+            - name: VIN
+              value: "${VIN}"
             - name: RABBITMQ_USER
               valueFrom:
                 secretKeyRef:
@@ -34,14 +29,6 @@ spec:
                   name: rabbitmq-default-user
                   key: password
             - name: RABBITMQ_HOST
-              valueFrom:
-                secretKeyRef:
-                  name: rabbitmq-default-user
-                  key: host
+              value: "rabbitmq"
             - name: RABBITMQ_PORT
-              valueFrom:
-                secretKeyRef:
-                  name: rabbitmq-default-user
-                  key: port
-            - name: "VIN"
-              value: ${VIN}
+              value: "5672"

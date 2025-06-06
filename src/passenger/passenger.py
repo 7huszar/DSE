@@ -127,24 +127,24 @@ def trigger_emergency_brake():
     source = data.get('source', 'Unknown')
     if not vin:
         return jsonify({"error": "VIN is required"}), 400
+
     try:
-        temp_credentials = pika.PlainCredentials(RABBITMQ_USER, RABBITMQ_PASSWORD)
-        temp_connection = pika.BlockingConnection(pika.ConnectionParameters(
-            host=RABBITMQ_HOST, port=RABBITMQ_PORT, credentials=temp_credentials
-        ))
-        temp_channel = temp_connection.channel()
-        message = {
-            'vin': vin,
-            'source': source,
-            'timestamp': time.time()
-        }
-        temp_channel.basic_publish(
-            exchange=EXCHANGE_NAME,
-            routing_key='backend.emergency.request',
-            body=json.dumps(message).encode('utf-8')
+        # Send to Central Director via HTTP
+        response = requests.post(
+            'http://central-director-service/emergency',
+            json={
+                'vin': vin,
+                'source': source,
+                'timestamp': time.time()
+            },
+            timeout=5
         )
-        temp_connection.close()
-        return jsonify({"status": "Emergency brake request sent", "vin": vin}), 200
+
+        if response.status_code == 200:
+            return jsonify({"status": "Emergency brake request sent", "vin": vin}), 200
+        else:
+            return jsonify({"error": "Failed to send emergency brake request"}), 500
+
     except Exception as e:
         print(f"[Passenger] Error sending emergency brake request: {e}")
         return jsonify({"error": "Failed to send emergency brake request"}), 500
