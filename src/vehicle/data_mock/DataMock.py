@@ -80,7 +80,7 @@ def trigger_break(vin: str):
     return jsonify({"vin": vin, "time": time.time()}), 200
 
 def send_data(addr: str, data):
-    logger.info(f"Send data to {addr} with body:{str(addr)}")
+    logger.info(f"Send data to {addr} with body:{data}")
 
     try:
         response = requests.post(addr, json=data, timeout=TIMEOUT)
@@ -96,12 +96,12 @@ def send_data(addr: str, data):
 def update_car(vehicle):
     """Update vehicle position and send data"""
 
+    scenario_module.mess_with_vehicle(vehicle)
+
     # Get new position
     new_coord = vehicle.sample()
 
     front_dst = scenario_module.compute_dst_front(vehicle)
-
-    logger.error(f"############################### here the front_dst: {front_dst} and speed: {vehicle.velocity} ################################")
 
     data_loc = {
             "vin": vehicle.vin,

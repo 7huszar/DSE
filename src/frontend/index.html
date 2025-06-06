@@ -260,7 +260,7 @@
                     <div class="vehicle-info">
                         <div class="info-item">
                             <span class="info-label">Speed</span>
-                            <span class="info-value">{{ vehicle.speed }} km/h</span>
+                            <span class="info-value">{{ formatSpeed(vehicle.speed) }} km/h</span>
                         </div>
                         <div class="info-item">
                             <span class="info-label">Location</span>
@@ -268,15 +268,15 @@
                         </div>
                         <div class="info-item">
                             <span class="info-label">Front Distance</span>
-                            <span class="info-value">{{ vehicle.frontDistance || '-' }} m</span>
+                            <span class="info-value">{{ formatDistance(vehicle.frontDistance) }}</span>
                         </div>
                         <div class="info-item">
                             <span class="info-label">Rear Distance</span>
-                            <span class="info-value">{{ vehicle.rearDistance || '-' }} m</span>
+                            <span class="info-value">{{ formatDistance(vehicle.rearDistance) }}</span>
                         </div>
                         <div class="distance-highlight" v-if="vehicle.frontDistance">
                             <div class="info-label">Front Distance</div>
-                            <div class="distance-value">{{ vehicle.frontDistance }} m</div>
+                            <div class="distance-value">{{ formatDistance(vehicle.frontDistance) }}</div>
                         </div>
                     </div>
                     <button class="emergency-button" @click="triggerEmergencyBrake(vehicle.vin)">
@@ -288,6 +288,7 @@
                 </div>
             </div>
 
+            <!-- Event Log remains unchanged -->
             <div class="event-log">
                 <div class="log-header">Event Log</div>
                 <div class="log-entries">
@@ -303,7 +304,6 @@
 
 <script src="https://cdn.jsdelivr.net/npm/vue@2.6.14/dist/vue.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<!-- Socket.IO client library is already included in <head> -->
 <script>
     new Vue({
         el: '#app',
@@ -491,15 +491,33 @@
                 });
                 this.eventLog.unshift({ timestamp, message });
                 if (this.eventLog.length > 100) {
-                    this.eventLog.pop(); // Remove oldest event
+                    this.eventLog.pop();
                 }
             },
 
-            formatLocation(location) { // location is vehicle.location
+            formatLocation(location) {
                 if (!location || typeof location.lat === 'undefined' || typeof location.lng === 'undefined') {
                     return '-';
                 }
                 return `${location.lat.toFixed(5)}, ${location.lng.toFixed(5)}`;
+            },
+
+            formatSpeed(speed) {
+                // Check if the input is a valid number.
+                if (typeof speed !== 'number' || isNaN(speed)) {
+                    return '-'; // Return a dash if not valid.
+                }
+                // Format the number to 2 decimal places and add the unit.
+                return `${speed.toFixed(2)} km/h`;
+            },
+
+            formatDistance(distance) {
+                // Check if the input is a valid number.
+                if (typeof distance !== 'number' || isNaN(distance)) {
+                    return '-'; // Return a dash if not valid.
+                }
+                // Format the number to 2 decimal places and add the unit.
+                return `${distance.toFixed(2)} m`;
             },
 
             async triggerEmergencyBrake(vin) {
@@ -524,8 +542,6 @@
                     alert('Error triggering emergency brake');
                 }
             }
-
-
         }
     });
 </script>

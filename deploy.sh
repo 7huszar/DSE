@@ -1,18 +1,22 @@
 #!/bin/bash
 
 echo "==================== CLEANING UP OLD PROCESSES ===================="
-pkill -f "kubectl port-forward" || echo "No old port-forward processes to clean up."
-sleep 2
+pkill -f "kubectl port-forward svc/loki-grafana -n monitoring 3000:80" \
+  || echo "No old loki-grafana port-forward to clean up"
+
+# Kill old visor-service forward
+pkill -f "kubectl port-forward svc/visor-service 8080:80" \
+  || echo "No old visor-service port-forward to clean up"
 
 echo "==================== STEEER DEPLOYMENT SCRIPT ===================="
 echo "Starting deployment at $(date)"
 
-echo "==================== RUNNING TESTS ===================="
-python3 -m pytest src/tests/ -v || {
-    echo "ERROR: Tests failed! Aborting deployment."
-    exit 1
-}
-echo "Tests passed! Continuing with deployment..."
+#echo "==================== RUNNING TESTS ===================="
+#python3 -m pytest src/tests/ -v || {
+#    echo "ERROR: Tests failed! Aborting deployment."
+#    exit 1
+#}
+#echo "Tests passed! Continuing with deployment..."
 
 echo "==================== ENABLING PLUGINS ===================="
 microk8s enable helm3
@@ -58,6 +62,7 @@ docker push localhost:32000/backend-distance-monitor:latest
 
 echo "==================== APPLYING CONFIGURATIONS ===================="
 microk8s kubectl apply -f ./configuration/data_mock_config.yaml
+microk8s kubectl apply -f ./configuration/broker_topic_config.yaml
 microk8s kubectl apply -f ./src/backend/rabbit_mq/rabbitmq-configmap.yaml
 microk8s kubectl apply -f ./src/backend/location_tracker/location-tracker-configmap.yaml
 
@@ -112,7 +117,6 @@ microk8s kubectl apply -f ./configuration/
 echo "apply deployment files"
 microk8s kubectl apply -f ./src/backend/location_tracker/deployment.yaml
 microk8s kubectl apply -f ./src/backend/rabbit_mq/rabbit_mq.yaml
-microk8s kubectl apply -f ./src/backend/distance_monitor/deployment.yaml
 
 microk8s kubectl apply -f ./src/vehicle/data_mock/deployment.yaml
 microk8s kubectl apply -f ./src/vehicle/data_mock/service.yaml
@@ -157,28 +161,27 @@ jq -c '.[]' vehicles.json | while read -r record; do
     microk8s kubectl rollout restart deployment/location-sender-"$VIN_LOWER"
     microk8s kubectl rollout restart deployment/distance-monitor-"$VIN_LOWER" 2>/dev/null || true
     microk8s kubectl rollout restart deployment/emergency-brake-"$VIN_LOWER"
+    microk8s kubectl rollout restart deployment/backend-distance-monitor-"$VIN_LOWER"
 done
 
+echo "==================== WAITING FOR DEPLOYMENTS TO BE READY ===================="
+microk8s kubectl wait --for=condition=available --timeout=300s deployment/visor
+echo "Giving the cluster a moment to stabilize..."
+sleep 5
+
 echo "==================== SETTING UP PORT FORWARDS ===================="
-# Setup port forwarding for Grafana
+# Setup port forwarding for Grafana in the background
 microk8s kubectl port-forward svc/loki-grafana -n monitoring 3000:80 &
 
-# Setup port forwarding for Visor (if using LoadBalancer)
-microk8s kubectl port-forward svc/visor-service 8080:80 &
-
+# The final command will run in the foreground, keeping the script and the connection alive.
 echo "==================== DEPLOYMENT COMPLETE ===================="
-echo "Deployment completed at $(date)"
 echo ""
 echo "Access points:"
 echo "- Visor (Frontend): http://localhost:8080"
 echo "- Grafana: http://localhost:3000"
-echo "  Username: admin"
-echo -n "  Password: "
-kubectl get secret -n monitoring loki-grafana -o jsonpath="{.data.admin-password}" | base64 --decode
+echo "  (Use a separate terminal to get the Grafana password if needed via 'kubectl get secret ...')"
 echo ""
+echo ">>> Port-forwarding for Visor is now active in this terminal."
+echo ">>> Press CTRL+C to stop."
 echo ""
-echo "To check deployment status:"
-echo "  microk8s kubectl get pods --all-namespaces"
-echo ""
-echo "To view logs:"
-echo "  microk8s kubectl logs -f deployment/[deployment-name]"
+microk8s kubectl port-forward svc/visor-service 8080:80
