@@ -28,12 +28,18 @@ vehicle_data = {}
 vehicle_locations = {}
 
 def get_db_connection():
-    return psycopg2.connect(
-        host=os.environ.get('CD_POSTGRES_HOST', 'cd-postgres'),
-        database="cd_db",
-        user=os.environ.get('CD_POSTGRES_USER', 'admin'),
-        password=os.environ.get('CD_POSTGRES_PASSWORD', 'admin')
-    )
+    not_succeeded = True
+    while not_succeeded:
+        try:
+            conn = psycopg2.connect(host=os.environ["CD_POSTGRES_HOST"], database="cd_db", user=os.environ["CD_POSTGRES_USER"], password=os.environ["CD_POSTGRES_PASSWORD"])
+            not_succeeded = False
+            logger.info("Connection to CD Database Succeeded!")
+            return conn
+        except psycopg2.OperationalError as e:
+            logger.warning(f"Failed to connect to postgres: {repr(e)}")
+    if not_succeeded:
+        time.sleep(5)
+    return None
 
 def init_database():
     try:
