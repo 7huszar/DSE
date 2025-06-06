@@ -56,7 +56,7 @@ def run_consumer():
 
     channel = connection.channel()
     logger.info("Started consumer with connection to RabbitMQ!")
-    channel.exchange_declare(exchange='broker', exchange_type='topic')
+    channel.exchange_declare(exchange='broker', exchange_type='topic', durable=True)
     result = channel.queue_declare('', exclusive=False)
     queue_name = result.method.queue
 
