@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend-distance-monitor
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backend-distance-monitor
+  template:
+    metadata:
+      labels:
+        app: backend-distance-monitor
+    spec:
+      containers:
+        - name: backend-distance-monitor
+          image: localhost:32000/backend-distance-monitor:latest
+          env:
+            - name: RABBITMQ_USER
+              valueFrom:
+                secretKeyRef:
+                  name: rabbitmq-default-user
+                  key: username
+            - name: RABBITMQ_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: rabbitmq-default-user
+                  key: password
+            - name: RABBITMQ_HOST
+              value: "rabbitmq"
+            - name: RABBITMQ_PORT
+              value: "5672"
