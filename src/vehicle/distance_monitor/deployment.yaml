@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: distance-monitor-${VIN_LOWER}
+  name: distance-monitor-${VIN_LOWER}-${SERVICE_DEPLOYMENT_LOCATION}
 spec:
   replicas: 1
   selector:
@@ -12,6 +12,7 @@ spec:
       labels:
         app: distance-monitor
         vin: ${VIN_LOWER}
+        location: ${SERVICE_DEPLOYMENT_LOCATION}
     spec:
       containers:
         - name: distance-monitor
@@ -19,6 +20,8 @@ spec:
           env:
             - name: VIN
               value: "${VIN}"
+            - name: SERVICE_DEPLOYMENT_LOCATION
+              value: "${SERVICE_DEPLOYMENT_LOCATION}"
             - name: RABBITMQ_USER
               valueFrom:
                 secretKeyRef:

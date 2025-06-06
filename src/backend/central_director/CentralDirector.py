@@ -6,7 +6,7 @@ import psycopg2.extras
 from datetime import datetime, timezone
 from flask import Flask, request, jsonify
 import time
-import requests
+import pika
 
 # Setup logging
 logging.basicConfig(
@@ -80,25 +80,36 @@ def store_event(vin, event_type, source=None, details=None):
 def trigger_emergency_brake_on_vehicle(vin):
     """Sends an HTTP request to the vehicle's Emergency Brake service."""
     logger.warning(f"ACTION: Triggering emergency brake for VIN {vin}.")
-    # The service name must be predictable. Assuming 'emergency-brake-<vin_lower>'.
-    # Your EmergencyBrake service listens on /trigger.
-    eb_service_url = f"http://emergency-brake-{vin.lower()}/trigger"
-    try:
-        # Send the command to the vehicle's microservice
-        response = requests.post(eb_service_url, json={'time': time.time()}, timeout=3)
-        if response.status_code == 200:
-            logger.info(f"Successfully sent emergency brake command to VIN {vin}.")
-            store_event(vin, "emergency_brake_command_sent", "CentralDirector")
-        else:
-            # Log failure if the vehicle service does not respond with 200 OK
-            logger.error(f"Failed to trigger emergency brake for {vin}. Status: {response.status_code}, Body: {response.text}")
-            store_event(vin, "emergency_brake_command_failed", "CentralDirector", {'status': response.status_code, 'body': response.text})
-    except requests.exceptions.RequestException as e:
-        # Log failure if the service is unreachable
-        logger.error(f"Error connecting to Emergency Brake service for {vin} at {eb_service_url}: {e}")
-        store_event(vin, "emergency_brake_command_failed", "CentralDirector", {'error': 'unreachable', 'details': str(e)})
+    RABBITMQ_USER = os.environ['RABBITMQ_USER']
+    RABBITMQ_PWD = os.environ['RABBITMQ_PASSWORD']
+    RABBITMQ_PORT = int(os.environ.get('RABBITMQ_PORT', 5672))
+    RABBITMQ_HOST = os.environ.get("RABBITMQ_HOST", "rabbitmq")
+    credentials = pika.PlainCredentials(
+        username=RABBITMQ_USER,
+        password=RABBITMQ_PWD
+    )
 
+    logger.info(f"Initiated Distance Monitor for Vehicle with VIN {vin.upper()}")
+    consumer_connection = pika.BlockingConnection(
+        pika.ConnectionParameters(
+            host=RABBITMQ_HOST,
+            port=RABBITMQ_PORT,
+            credentials=credentials))
 
+    if(consumer_connection == None):
+        logger.error("Could not establish connection to RabbitMQ!")
+    consumer_channel = consumer_connection.channel()
+
+    routing_key = os.environ.get("EMERGENCY_BRAKE_FRONTEND").format(vin=vin.upper())
+
+    logger.info(f"Routing key: {routing_key}")
+    body = {"time": time.time()}
+    consumer_channel.queue_declare('', exclusive=False)
+    consumer_channel.exchange_declare(exchange=os.environ.get("BROKER_EXCHANGE"), exchange_type='topic', durable=True)
+    consumer_channel.queue_bind('',exchange=os.environ.get("BROKER_EXCHANGE"), routing_key=routing_key)
+    consumer_channel.basic_publish(exchange=os.environ.get("BROKER_EXCHANGE"), routing_key=routing_key, body=json.dumps(body).encode("utf-8"))
+
+    logger.info("Published emergency brake to frontend emergency brake via RabbitMQ!")
 
 # --- API Endpoints ---
 @app.route('/health', methods=['GET'])

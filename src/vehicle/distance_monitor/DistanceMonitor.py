@@ -41,10 +41,14 @@ class DistanceMonitorService(BaseSenderService):
         self.logger.info(self.change_rate)
         if dst_front < 10.0 and self.change_rate > 4.0:
             trigger_data = {
-                "time": time.time()
+                "time": time.time(),
+                "vin": self.vin
             }
             self.logger.info(f"Trigger emergency brake, because frontal distance is {dst_front} < 16.0")
-            self.send_data(f"http://emergency-brake-{self.vin.lower()}/trigger", trigger_data)
+            if os.environ.get("SERVICE_DEPLOYMENT_LOCATION") == "vehicle":
+                self.send_data(f"http://emergency-brake-{self.vin.lower()}/trigger", trigger_data)
+            if os.environ.get("SERVICE_DEPLOYMENT_LOCATION") == "backend":
+                self.send_data(f"http://central-director-service/emergency", trigger_data)
 
         try:
             new_data = {

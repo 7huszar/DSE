@@ -47,7 +47,7 @@ docker build -t localhost:32000/passenger:latest ./src/passenger/
 docker build -t localhost:32000/visor:latest ./src/frontend/
 docker build -t localhost:32000/emergency-brake:latest -f ./src/vehicle/emergency_brake/Dockerfile .
 docker build -t localhost:32000/central-director:latest ./src/backend/central_director/
-docker build -t localhost:32000/backend-distance-monitor:latest ./src/backend/distance_monitor/
+#docker build -t localhost:32000/backend-distance-monitor:latest ./src/backend/distance_monitor/
 
 echo "==================== PUSHING DOCKER IMAGES ===================="
 docker push localhost:32000/location-tracker:latest
@@ -58,7 +58,7 @@ docker push localhost:32000/visor:latest
 docker push localhost:32000/distance-monitor:latest
 docker push localhost:32000/emergency-brake:latest
 docker push localhost:32000/central-director:latest
-docker push localhost:32000/backend-distance-monitor:latest
+#docker push localhost:32000/backend-distance-monitor:latest
 
 echo "==================== APPLYING CONFIGURATIONS ===================="
 microk8s kubectl apply -f ./configuration/data_mock_config.yaml
@@ -99,11 +99,23 @@ jq -c '.[]' vehicles.json | while read -r record; do
     envsubst < ./src/vehicle/location_sender/deployment.yaml | microk8s kubectl apply -f -
     envsubst < ./src/vehicle/location_sender/service.yaml | microk8s kubectl apply -f -
 
-    # Distance Monitor (per vehicle)
+    echo "Deploying distance monitors for vehicle side..."
+    SERVICE_DEPLOYMENT_LOCATION="vehicle"
+    export SERVICE_DEPLOYMENT_LOCATION
+    echo $SERVICE_DEPLOYMENT_LOCATION
+
+    # Distance Monitor (on Vehicle)
     envsubst < ./src/vehicle/distance_monitor/deployment.yaml | microk8s kubectl apply -f -
     envsubst < ./src/vehicle/distance_monitor/service.yaml | microk8s kubectl apply -f -
 
-    envsubst < ./src/backend/distance_monitor/deployment.yaml | microk8s kubectl apply -f -
+    echo "Deploying distance monitor for backend side..."
+    SERVICE_DEPLOYMENT_LOCATION="backend"
+    export SERVICE_DEPLOYMENT_LOCATION
+    echo $SERVICE_DEPLOYMENT_LOCATION
+
+    # Distance Monitor (in Backend)
+    envsubst < ./src/vehicle/distance_monitor/deployment.yaml | microk8s kubectl apply -f -
+    envsubst < ./src/vehicle/distance_monitor/service.yaml | microk8s kubectl apply -f -
 
     envsubst < ./src/vehicle/emergency_brake/deployment.yaml | microk8s kubectl apply -f -
     envsubst < ./src/vehicle/emergency_brake/service.yaml | microk8s kubectl apply -f -
@@ -121,6 +133,7 @@ microk8s kubectl apply -f ./src/backend/rabbit_mq/rabbit_mq.yaml
 microk8s kubectl apply -f ./src/vehicle/data_mock/deployment.yaml
 microk8s kubectl apply -f ./src/vehicle/data_mock/service.yaml
 
+microk8s kubectl apply -f ./src/backend/central_director/cd-deployment.yaml
 microk8s kubectl apply -f ./src/backend/central_director/service.yaml
 
 microk8s kubectl apply -f ./src/passenger/deployment.yaml
@@ -159,9 +172,9 @@ jq -c '.[]' vehicles.json | while read -r record; do
     VIN=$(echo "$record" | jq -r '.vin')
     VIN_LOWER=${VIN,,}
     microk8s kubectl rollout restart deployment/location-sender-"$VIN_LOWER"
-    microk8s kubectl rollout restart deployment/distance-monitor-"$VIN_LOWER" 2>/dev/null || true
+    microk8s kubectl rollout restart deployment/distance-monitor-"$VIN_LOWER"-vehicle 2>/dev/null || true
+    microk8s kubectl rollout restart deployment/distance-monitor-"$VIN_LOWER"-backend 2>/dev/null || true
     microk8s kubectl rollout restart deployment/emergency-brake-"$VIN_LOWER"
-    microk8s kubectl rollout restart deployment/backend-distance-monitor-"$VIN_LOWER"
 done
 
 echo "==================== WAITING FOR DEPLOYMENTS TO BE READY ===================="
