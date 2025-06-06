@@ -294,3 +294,22 @@ Saves message in database.
 - `start`: Optional, UTC ISO 8601 with microseconds, filter for start date
 
 - `end`: Optional, UTC ISO 8601 with microseconds, filter for end date
+
+### Viso
+
+```json
+{
+  "vin": "asdf",
+  "lon": 23.39,
+  "lat": 23.48
+}
+```
+
+```json
+{
+  "vin": "saf"
+  "dst_front": 5,
+  "dst_back": 3,
+  "time"
+}
+```

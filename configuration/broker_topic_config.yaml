@@ -7,3 +7,5 @@ data:
   "DISTANCE_MONITOR_BACKEND": "backend.{vin}.distance.monitor"
   "LOCATION_TRACKER_BACKEND": "backend.location.tracker"
   "CENTRAL_DIRECTOR_BACKEND": "backend.central.director"
+  "VISOR_LOCATION": "visor.location"
+  "VISOR_DISTANCE": "visor.distance"

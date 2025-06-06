@@ -16,16 +16,23 @@ spec:
     spec:
       containers:
         - name: visor
-          image: localhost:32000/visor:latest
+          image: localhost:32000/visor:latest     # same image, now contains bridge code
           ports:
             - containerPort: 80
+          env:
+            - name: BROKER_EXCHANGE
+              value: "broker"
+            - name: VISOR_LOCATION
+              value: "visor.location"
+            - name: VISOR_DISTANCE
+              value: "visor.distance"
           resources:
             requests:
-              memory: "64Mi"
               cpu: "100m"
+              memory: "64Mi"
             limits:
-              memory: "128Mi"
               cpu: "200m"
+              memory: "128Mi"
 ---
 apiVersion: v1
 kind: Service
