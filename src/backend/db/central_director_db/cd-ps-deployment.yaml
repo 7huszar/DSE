@@ -22,7 +22,7 @@ spec:
             - configMapRef:
                 name: cd-postgres-secret
           volumeMounts:
-            - mountPath: /var/lib/postgresql/data
+            - mountPath: /var/lib/cd-postgres/data
               name: cd-postgresdata
       volumes:
         - name: cd-postgresdata
