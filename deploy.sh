@@ -1,5 +1,9 @@
 #!/bin/bash
 
+echo "==================== CLEANING UP OLD PROCESSES ===================="
+pkill -f "kubectl port-forward" || echo "No old port-forward processes to clean up."
+sleep 2
+
 echo "==================== STEEER DEPLOYMENT SCRIPT ===================="
 echo "Starting deployment at $(date)"
 
