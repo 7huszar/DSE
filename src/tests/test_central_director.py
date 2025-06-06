@@ -1,14 +1,14 @@
-import unittest
 import sys
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import MagicMock
 
-mock_psycopg2 = MagicMock()
-mock_psycopg2.extras = MagicMock()
-sys.modules['psycopg2'] = mock_psycopg2
+sys.modules['psycopg2'] = MagicMock()
+sys.modules['psycopg2.extras'] = MagicMock()
 
-mock_pika = MagicMock()
-sys.modules['pika'] = mock_pika
+sys.modules['pika'] = MagicMock()
+sys.modules['pika.exceptions'] = MagicMock()
 
+import unittest
+from unittest.mock import patch
 from src.backend.central_director.CentralDirector import store_event, check_emergency_conditions
 
 class TestCentralDirector(unittest.TestCase):

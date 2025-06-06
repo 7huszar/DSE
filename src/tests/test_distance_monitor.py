@@ -1,11 +1,11 @@
-import unittest
 import sys
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import MagicMock
 
-mock_pika = MagicMock()
-mock_pika.exceptions = MagicMock()
-sys.modules['pika'] = mock_pika
 
+sys.modules['pika'] = MagicMock()
+sys.modules['pika.exceptions'] = MagicMock()
+
+import unittest
 from src.backend.distance_monitor.BackendDistanceMonitor import calculate_change_rate, check_emergency_conditions
 
 class TestBackendDistanceMonitor(unittest.TestCase):
