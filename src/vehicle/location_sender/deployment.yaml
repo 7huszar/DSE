@@ -11,6 +11,7 @@ spec:
     metadata:
       labels:
         app: location-sender
+        vin: ${VIN_LOWER}
     spec:
       containers:
         - name: location-sender

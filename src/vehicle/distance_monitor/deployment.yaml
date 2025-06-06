@@ -1,20 +1,21 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: backend-distance-monitor-${VIN_LOWER}
+  name: distance-monitor-${VIN_LOWER}
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: backend-distance-monitor-${VIN_LOWER}
+      app: distance-monitor
   template:
     metadata:
       labels:
-        app: backend-distance-monitor-${VIN_LOWER}
+        app: distance-monitor
+        vin: ${VIN_LOWER}
     spec:
       containers:
-        - name: backend-distance-monitor
-          image: localhost:32000/backend-distance-monitor:latest
+        - name: distance-monitor
+          image: localhost:32000/distance-monitor:latest
           env:
             - name: VIN
               value: "${VIN}"

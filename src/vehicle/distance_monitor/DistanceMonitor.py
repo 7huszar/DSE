@@ -32,12 +32,14 @@ class DistanceMonitorService(BaseSenderService):
     def receive_data(self):
         data = request.get_json()
         self.logger.info(f"Received data: {str(data)}")
+        dst_front = float(data["dst_front"])
 
         if self.last_dst_front != 0.0:
-            self.change_rate = self.last_dst_front - float(data["dst_front"])
+            self.change_rate = self.last_dst_front - dst_front
+        self.last_dst_front = dst_front
 
-        dst_front = float(data["dst_front"])
-        if dst_front < 10.0 and self.change_rate > 5.0:
+        self.logger.info(self.change_rate)
+        if dst_front < 10.0 and self.change_rate > 4.0:
             trigger_data = {
                 "time": time.time()
             }
@@ -47,7 +49,7 @@ class DistanceMonitorService(BaseSenderService):
         try:
             new_data = {
                 "vin": data["vin"],
-                "dst_front": data["front_dst"],
+                "dst_front": data["dst_front"],
                 "time": data["time"],
                 "change_rate": self.change_rate
             }
