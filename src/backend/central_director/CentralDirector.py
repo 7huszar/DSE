@@ -9,6 +9,7 @@ import threading
 import time
 import requests
 from math import radians, sin, cos, sqrt, atan2
+import pika
 
 # Constants
 CONDITION_1_DISTANCE = 20
@@ -89,9 +90,9 @@ def store_event(vin, event_type, source=None, details=None):
         conn = get_db_connection()
         cur = conn.cursor()
         cur.execute("""
-    INSERT INTO emergency_events (vin, timestamp, event_type, source, details)
-    VALUES (%s, %s, %s, %s, %s)
-""", (vin, datetime.now(timezone.utc), event_type, source, json.dumps(details) if details else None))
+            INSERT INTO emergency_events (vin, timestamp, event_type, source, details)
+            VALUES (%s, %s, %s, %s, %s)
+        """, (vin, datetime.now(timezone.utc), event_type, source, json.dumps(details) if details else None))
         conn.commit()
         cur.close()
         conn.close()
@@ -134,6 +135,65 @@ def trigger_emergency_brake_on_vehicle(vin):
         logger.error(f"Error connecting to Emergency Brake service for {vin} at {eb_service_url}: {e}")
         store_event(vin, "emergency_brake_command_failed", "CentralDirector", {'error': 'unreachable', 'details': str(e)})
 
+# RabbitMQ Consumer für Emergency Brake Acknowledgments
+def rabbitmq_consumer():
+    """Consumes emergency brake acknowledgment messages from RabbitMQ."""
+    while True:
+        try:
+            credentials = pika.PlainCredentials(
+                username=os.environ.get('RABBITMQ_USER', 'guest'),
+                password=os.environ.get('RABBITMQ_PASSWORD', 'guest')
+            )
+            connection = pika.BlockingConnection(
+                pika.ConnectionParameters(
+                    host=os.environ.get('RABBITMQ_HOST', 'rabbitmq'),
+                    port=int(os.environ.get('RABBITMQ_PORT', 5672)),
+                    credentials=credentials,
+                    heartbeat=600,
+                    blocked_connection_timeout=300
+                )
+            )
+            channel = connection.channel()
+            logger.info("Connected to RabbitMQ for emergency brake acknowledgments.")
+
+            # Declare exchange and queue
+            channel.exchange_declare(exchange='broker', exchange_type='topic', durable=True)
+            queue = channel.queue_declare(queue='cd_emergency_brake_acks', durable=True)
+            channel.queue_bind(
+                exchange='broker',
+                queue=queue.method.queue,
+                routing_key='backend.location.tracker'
+            )
+
+            def callback(ch, method, properties, body):
+                try:
+                    data = json.loads(body.decode('utf-8'))
+                    vin = data.get('vin', '').upper()
+                    command = data.get('command')
+
+                    if command == 'emergency_stop' and vin:
+                        logger.info(f"Received emergency brake acknowledgment from {vin}")
+                        store_event(
+                            vin,
+                            "emergency_brake_acknowledged",
+                            data.get('source', 'Vehicle'),
+                            {'reason': data.get('reason'), 'timestamp': data.get('timestamp')}
+                        )
+                except Exception as e:
+                    logger.error(f"Error processing emergency brake ack: {e}", exc_info=True)
+
+            channel.basic_consume(
+                queue=queue.method.queue,
+                on_message_callback=callback,
+                auto_ack=True
+            )
+
+            logger.info("Started consuming emergency brake acknowledgments.")
+            channel.start_consuming()
+
+        except Exception as e:
+            logger.error(f"RabbitMQ consumer error: {e}. Retrying in 5s...")
+            time.sleep(5)
 
 # --- API Endpoints ---
 @app.route('/health', methods=['GET'])
@@ -236,9 +296,9 @@ def get_events():
         conn = get_db_connection()
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute("""
-                SELECT vin, timestamp, event_type, source, details 
-                FROM emergency_events 
-                ORDER BY timestamp DESC 
+                SELECT vin, timestamp, event_type, source, details
+                FROM emergency_events
+                ORDER BY timestamp DESC
                 LIMIT 50
             """)
             events = cur.fetchall()
@@ -257,4 +317,9 @@ def get_events():
 if __name__ == '__main__':
     # Initialize the database before starting the web server
     init_database()
+
+    consumer_thread = threading.Thread(target=rabbitmq_consumer, daemon=True)
+    consumer_thread.start()
+    logger.info("Started RabbitMQ consumer thread.")
+
     app.run(host='0.0.0.0', port=5000, debug=False)

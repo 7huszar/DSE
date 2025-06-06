@@ -1,21 +1,26 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: backend-distance-monitor
+  name: backend-distance-monitor-${VIN_LOWER}
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: backend-distance-monitor
+      app: backend-distance-monitor-${VIN_LOWER}
   template:
     metadata:
       labels:
-        app: backend-distance-monitor
+        app: backend-distance-monitor-${VIN_LOWER}
     spec:
       containers:
         - name: backend-distance-monitor
           image: localhost:32000/backend-distance-monitor:latest
+          envFrom:
+            - configMapRef:
+                name: broker-topic-config
           env:
+            - name: VIN
+              value: "${VIN}"
             - name: RABBITMQ_USER
               valueFrom:
                 secretKeyRef:
