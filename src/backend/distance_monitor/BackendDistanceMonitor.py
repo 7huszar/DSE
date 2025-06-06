@@ -1,20 +1,17 @@
-import threading
+import os
 import time
 import pika
 import json
-import os
 import logging
+import requests
 from pika.exceptions import AMQPConnectionError
 from collections import defaultdict
 
-### CONSTANTS START ###
 RETRY_WAIT = 5
-# Emergency brake conditions (from PDF page 9)
-CONDITION_1_DISTANCE = 20  # meters
-CONDITION_1_RATE = 3  # m/s (decreasing)
-CONDITION_2_DISTANCE = 40  # meters
-CONDITION_2_RATE = 5  # m/s (decreasing)
-### CONSTANTS END ###
+CONDITION_1_DISTANCE = 20
+CONDITION_1_RATE = 3
+CONDITION_2_DISTANCE = 40
+CONDITION_2_RATE = 5
 
 logging.basicConfig(
     level=logging.INFO,
@@ -22,7 +19,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Store vehicle distance data for rate calculation
 vehicle_distances = defaultdict(lambda: {
     'front_distance': None,
     'last_front_distance': None,
@@ -30,14 +26,11 @@ vehicle_distances = defaultdict(lambda: {
 })
 
 def calculate_change_rate(current_distance, last_distance, time_diff):
-    """Calculate distance change rate in m/s"""
     if last_distance is None or time_diff == 0:
         return 0
     return (current_distance - last_distance) / time_diff
 
 def check_emergency_conditions(distance, change_rate):
-    """Check if emergency brake conditions are met"""
-    # Check conditions (negative change_rate means decreasing distance)
     if distance < CONDITION_1_DISTANCE and change_rate < -CONDITION_1_RATE:
         return True
     if distance < CONDITION_2_DISTANCE and change_rate < -CONDITION_2_RATE:
@@ -45,16 +38,14 @@ def check_emergency_conditions(distance, change_rate):
     return False
 
 def vehicle_dm_callback(ch, method, properties, body):
-    """Process messages from Vehicle Distance Monitor"""
     try:
         data = json.loads(body.decode('utf-8'))
         vin = data.get('vin')
         dst_front = float(data.get('dst_front', 0))
         current_time = time.time()
 
-        logger.info(f"Backend DM received from Vehicle DM - VIN: {vin}, Front: {dst_front}m")
+        logger.info(f"Backend DM received: VIN={vin}, Front={dst_front}m")
 
-        # Get previous data for this vehicle
         vehicle = vehicle_distances[vin]
 
         # Calculate change rate
@@ -69,40 +60,35 @@ def vehicle_dm_callback(ch, method, properties, body):
         vehicle['front_distance'] = dst_front
         vehicle['last_update_time'] = current_time
 
-        # Check emergency conditions - Backend DM can also trigger EB!
-        if check_emergency_conditions(dst_front, front_rate):
-            logger.warning(f"EMERGENCY CONDITION MET! Vehicle {vin} - distance={dst_front}m, rate={front_rate}m/s")
-
-            # Send emergency brake command directly
-            eb_command = {
+        # Send to Central Director via HTTP
+        try:
+            cd_data = {
                 'vin': vin,
-                'command': 'emergency_stop',
-                'reason': f"Backend DM: Critical distance {dst_front:.1f}m, rate {abs(front_rate):.1f}m/s",
-                'source': 'backend_dm',
+                'distance': dst_front,
+                'change_rate': front_rate,
                 'timestamp': current_time
             }
 
-            ch.basic_publish(
-                exchange='broker',
-                routing_key=f'vehicle.{vin}.emergency.break',  # Direct to vehicle EB
-                body=json.dumps(eb_command).encode('utf-8')
+            response = requests.post(
+                'http://central-director-service/distance',
+                json=cd_data,
+                timeout=5
             )
-            logger.info(f"Emergency brake triggered by Backend DM for {vin}")
 
-        # Forward processed data to Central Director
-        cd_data = {
-            'vin': vin,
-            'distance': dst_front,
-            'change_rate': front_rate,
-            'timestamp': current_time
-        }
+            if response.status_code == 200:
+                logger.info(f"Sent distance data to CD for {vin}")
 
-        # Send to Central Director
-        ch.basic_publish(
-            exchange='broker',
-            routing_key='backend.distance.front',
-            body=json.dumps(cd_data).encode('utf-8')
-        )
+                # Check if emergency was triggered
+                result = response.json()
+                if result.get('status') == 'emergency':
+                    logger.warning(f"EMERGENCY triggered by CD for {vin}")
+                    # The CD will handle the emergency brake
+
+            else:
+                logger.error(f"Failed to send to CD: {response.status_code}")
+
+        except Exception as e:
+            logger.error(f"Error sending to Central Director: {e}")
 
         # Also send to passenger for display
         display_data = {
@@ -116,18 +102,14 @@ def vehicle_dm_callback(ch, method, properties, body):
             body=json.dumps(display_data).encode('utf-8')
         )
 
-        logger.info(f"Backend DM forwarded to CD for {vin} (distance: {dst_front:.1f}m, rate: {front_rate:.2f}m/s)")
-
     except Exception as e:
-        logger.error(f"Error processing vehicle DM message: {e}")
-
-# RabbitMQ connection setup
-credentials = pika.PlainCredentials(
-    username=os.environ.get('RABBITMQ_USER', 'guest'),
-    password=os.environ.get('RABBITMQ_PASSWORD', 'guest')
-)
+        logger.error(f"Error processing message: {e}")
 
 def get_rabbitmq_connection():
+    credentials = pika.PlainCredentials(
+        username=os.environ.get('RABBITMQ_USER', 'guest'),
+        password=os.environ.get('RABBITMQ_PASSWORD', 'guest')
+    )
     return pika.BlockingConnection(
         pika.ConnectionParameters(
             host=os.environ.get('RABBITMQ_HOST', 'rabbitmq'),
@@ -138,47 +120,44 @@ def get_rabbitmq_connection():
         )
     )
 
-# Main execution
-not_succeeded = True
-connection = None
-while not_succeeded:
+if __name__ == '__main__':
+    # Connect to RabbitMQ
+    connection = None
+    while connection is None:
+        try:
+            connection = get_rabbitmq_connection()
+            logger.info("Connected to RabbitMQ")
+        except AMQPConnectionError as e:
+            logger.warning(f"Failed to connect: {e}. Retrying in {RETRY_WAIT} seconds.")
+            time.sleep(RETRY_WAIT)
+
+    channel = connection.channel()
+    channel.exchange_declare(exchange='broker', exchange_type='topic', durable=True)
+
+    # Create queue for receiving vehicle DM messages
+    dm_queue = channel.queue_declare(queue='backend_distance_monitor_queue', durable=True)
+    channel.queue_bind(
+        exchange='broker',
+        queue=dm_queue.method.queue,
+        routing_key='backend.location.distance_monitor'
+    )
+
+    # Start consuming
+    channel.basic_consume(
+        queue=dm_queue.method.queue,
+        on_message_callback=vehicle_dm_callback,
+        auto_ack=True
+    )
+
+    logger.info("Backend Distance Monitor started")
+
     try:
-        connection = get_rabbitmq_connection()
-        not_succeeded = False
-    except AMQPConnectionError as e:
-        logger.warning(f"Failed to connect: {repr(e)}. Retrying in {RETRY_WAIT} seconds.")
-        time.sleep(RETRY_WAIT)
-
-logger.info("Successfully connected to RabbitMQ")
-channel = connection.channel()
-channel.exchange_declare(exchange='broker', exchange_type='topic', durable=True)
-
-# Create queue for receiving vehicle DM messages
-dm_queue = channel.queue_declare(queue='backend_distance_monitor_queue', durable=True)
-
-# Subscribe to messages from vehicle distance monitor
-channel.queue_bind(
-    exchange='broker',
-    queue=dm_queue.method.queue,
-    routing_key='backend.location.distance_monitor'
-)
-
-# Set up consumer
-channel.basic_consume(
-    queue=dm_queue.method.queue,
-    on_message_callback=vehicle_dm_callback,
-    auto_ack=True
-)
-
-logger.info("Backend Distance Monitor started. Subscribing to 'backend.location.distance_monitor'...")
-
-try:
-    channel.start_consuming()
-except KeyboardInterrupt:
-    logger.info("Stopping Backend Distance Monitor...")
-    channel.stop_consuming()
-    connection.close()
-except Exception as e:
-    logger.error(f"Backend Distance Monitor error: {e}")
-    if connection and not connection.is_closed:
+        channel.start_consuming()
+    except KeyboardInterrupt:
+        logger.info("Stopping Backend Distance Monitor...")
+        channel.stop_consuming()
         connection.close()
+    except Exception as e:
+        logger.error(f"Error: {e}")
+        if connection and not connection.is_closed:
+            connection.close()

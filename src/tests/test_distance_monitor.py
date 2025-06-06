@@ -1,11 +1,12 @@
 import unittest
 import json
 import time
-from unittest.mock import Mock, patch, MagicMock
-from collections import defaultdict
-
-# Mock the modules before importing
 import sys
+import os
+from unittest.mock import Mock, patch, MagicMock
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
+
 sys.modules['pika'] = MagicMock()
 
 class TestBackendDistanceMonitor(unittest.TestCase):

@@ -1,10 +1,15 @@
 import unittest
+import json
+import sys
+import os
 from unittest.mock import Mock, patch, MagicMock
 
-# Mock the modules
-import sys
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
+
+# Mock modules
 sys.modules['psycopg2'] = MagicMock()
 sys.modules['pika'] = MagicMock()
+sys.modules['requests'] = MagicMock()
 
 class TestCentralDirector(unittest.TestCase):
     """Test cases for the Central Director service"""

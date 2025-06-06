@@ -1,7 +1,13 @@
 import unittest
 import time
 import math
-from src.vehicle.data_mock.vehicle import Vehicle
+import sys
+import os
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
+
+from vehicle.data_mock.vehicle import Vehicle
+
 
 class TestVehicleSample(unittest.TestCase):
     """Test cases for the Vehicle.sample() method"""
