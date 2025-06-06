@@ -1,10 +1,11 @@
 import json
 import os
+import threading
 import time
 import logging
 from vehicle import Vehicle
 import requests
-from flask import Flask
+from flask import Flask, jsonify
 import numpy as np
 import importlib
 
@@ -70,11 +71,13 @@ vehicles = {
 
 print("Init data mock with car(s):")
 for vehicle in vehicles:
-    print(vehicle)
+    print(vehicle.__str__())
 
-@app.route("/break/<vin>", methods=["POST"])
+@app.route("/brake/<vin>", methods=["POST"])
 def trigger_break(vin: str):
+    logger.info(f"Emergency break triggered for {vin}")
     vehicles.get(vin).sample(acceleration=BRAKE_DECELERATION)
+    return jsonify({"vin": vin, "time": time.time()}), 200
 
 def send_data(addr: str, data):
     logger.info(f"Send data to {addr} with body:{str(addr)}")
@@ -98,6 +101,8 @@ def update_car(vehicle):
 
     front_dst = scenario_module.compute_dst_front(vehicle)
 
+    logger.error(f"############################### here the front_dst: {front_dst} and speed: {vehicle.velocity} ################################")
+
     data_loc = {
             "vin": vehicle.vin,
             "lat": float(new_coord["lat"]),
@@ -113,13 +118,15 @@ def update_car(vehicle):
     data_mon = {
         "vin": vehicle.vin,
         "dst_front": front_dst,
-        "speed": vehicle.velocity * 3.6
+        "speed": vehicle.velocity * 3.6,
+        "time": time.time()
     }
 
     addr_mon = BASE_URI_MON.format(vehicle.vin.lower())
 
     send_data(addr_mon, data_mon)
 
+threading.Thread(target=app.run, kwargs={"host": "0.0.0.0", "port": 5000}, daemon=True).start()
 while True:
     for vehicle in vehicles.values():
         update_car(vehicle)

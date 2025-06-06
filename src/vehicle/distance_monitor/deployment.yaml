@@ -43,3 +43,5 @@ spec:
                 secretKeyRef:
                   name: rabbitmq-default-user
                   key: port
+            - name: "VIN"
+              value: ${VIN}

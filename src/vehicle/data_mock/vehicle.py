@@ -30,14 +30,22 @@ class Vehicle:
         # F(t) = 0.5(t^2) * acc + vel * t + C
 
         distance = self.acceleration * (math.pow(delta_time, 2.0) / 2.0) + (self.velocity * delta_time)
+        self.velocity = delta_time * self.acceleration + self.velocity
+        if distance < 0.0:
+            distance = 0.0
+        if self.velocity <= 0.0:
+            self.velocity = 0.0
+            if self.acceleration < 0.0:
+                self.acceleration = 0.0
 
         # x = longitude
         # y = latitude
         dx = self.direction[0] * distance
         dy = self.direction[1] * distance
 
+        lat0 = self.latitude
+        self.longitude += (dx / (self.earth_radius * math.cos(math.radians(lat0)))) * (180 / math.pi)
         self.latitude += (dy / self.earth_radius) * (180 / math.pi)
-        self.longitude += (dx / (self.earth_radius * math.cos(math.radians(self.latitude)))) * (180 / math.pi)
 
         return {
             "lat": self.latitude,
