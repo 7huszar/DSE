@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 import json
 import os
 import threading
@@ -62,9 +63,17 @@ class EmergencyBrake(BaseRabbitMqConnection):
                     with self.time_lock:
                         self.last_brake_time = float(response.json().get("time"))
 
+                    data = {
+                        "vin": f"{self.vin.upper()}",
+                        "command": "emergency_stop",
+                        "reason": "Bc I can",
+                        "source": "test",
+                        "timestamp": datetime.now(timezone.utc).timestamp()
+                    }
+
                     self.logger.info(f"Successful post request to {self.addr}. \nResponse status: {response.status_code}\n Response body: {response.text}")
                     self.logger.info(f"Triggered emergency break for {self.vin}")
-                    self.publish(data=response.json())
+                    self.publish(data=data)
                 else:
                     self.logger.warning(f"Failed post request to {self.addr}. \nResponse status: {response.status_code}\n Response body: {response.text}")
                     return jsonify(response.json()), response.status_code
@@ -91,9 +100,7 @@ class EmergencyBrake(BaseRabbitMqConnection):
 
 
     def run(self):
-        super().run()
-
-        self.channel.queue_bind(exchange='broker', queue=self.queue_name, routing_key='vehicle.emergency_break')
+        self.channel.queue_bind(exchange='broker', queue=self.queue_name, routing_key=f'vehicle.{self.vin.upper()}.emergency.break')
         self.consumer_thread.start()
         self.flask_thread.start()
 
@@ -105,7 +112,7 @@ class EmergencyBrake(BaseRabbitMqConnection):
         self.consumer_connection = self.get_rabbitmq_connection()
         self.consumer_channel = self.consumer_connection.channel()
 
-        self.consumer_channel.queue_bind(exchange='broker', queue=self.queue_name, routing_key='vehicle.emergency_break')
+        self.consumer_channel.queue_bind(exchange='broker', queue=self.queue_name, routing_key=f'vehicle.{self.vin.upper()}.emergency.break')
 
         self.consumer_channel.basic_consume(queue=self.queue_name, on_message_callback=self.callback, auto_ack=True)
 

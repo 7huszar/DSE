@@ -1,20 +1,17 @@
 #!/bin/bash
 
+echo "==================== CLEANING UP OLD PROCESSES ===================="
+pkill -f "kubectl port-forward" || echo "No old port-forward processes to clean up."
+sleep 2
+
 echo "==================== STEEER DEPLOYMENT SCRIPT ===================="
 echo "Starting deployment at $(date)"
 
-# Run tests first
-# echo "==================== RUNNING TESTS ===================="
-# cd ./src/vehicle/data_mock/
-# python3 -m pytest test_vehicle.py -v || python3 test_vehicle.py
-# TEST_RESULT=$?
-# cd ../../../
-
-if [ $TEST_RESULT -ne 0 ]; then
+echo "==================== RUNNING TESTS ===================="
+python3 -m pytest src/tests/ -v || {
     echo "ERROR: Tests failed! Aborting deployment."
     exit 1
-fi
-
+}
 echo "Tests passed! Continuing with deployment..."
 
 echo "==================== ENABLING PLUGINS ===================="
@@ -38,7 +35,6 @@ microk8s helm3 install loki grafana/loki-stack \
   -n monitoring
 
 echo "==================== BUILDING DOCKER IMAGES ===================="
-# Build all images
 docker build -t localhost:32000/location-tracker:latest ./src/backend/location_tracker/
 docker build -t localhost:32000/location-sender:latest -f ./src/vehicle/location_sender/Dockerfile .
 docker build -t localhost:32000/data-mock:latest -f ./src/vehicle/data_mock/Dockerfile .
@@ -46,7 +42,8 @@ docker build -t localhost:32000/distance-monitor:latest -f ./src/vehicle/distanc
 docker build -t localhost:32000/passenger:latest ./src/passenger/
 docker build -t localhost:32000/visor:latest ./src/frontend/
 docker build -t localhost:32000/emergency-brake:latest -f ./src/vehicle/emergency_brake/Dockerfile .
-docker build -t localhost:32000/central-director:latest ./src/vehicle/central_director/
+docker build -t localhost:32000/central-director:latest ./src/backend/central_director/
+docker build -t localhost:32000/backend-distance-monitor:latest ./src/backend/distance_monitor/
 
 echo "==================== PUSHING DOCKER IMAGES ===================="
 docker push localhost:32000/location-tracker:latest
@@ -57,23 +54,25 @@ docker push localhost:32000/visor:latest
 docker push localhost:32000/distance-monitor:latest
 docker push localhost:32000/emergency-brake:latest
 docker push localhost:32000/central-director:latest
+docker push localhost:32000/backend-distance-monitor:latest
 
 echo "==================== APPLYING CONFIGURATIONS ===================="
-# Apply config maps
+microk8s kubectl apply -f ./configuration/data_mock_config.yaml
 microk8s kubectl apply -f ./src/backend/rabbit_mq/rabbitmq-configmap.yaml
 microk8s kubectl apply -f ./src/backend/location_tracker/location-tracker-configmap.yaml
 
 echo "==================== DEPLOYING DATABASES ===================="
-# Deploy PostgreSQL databases
-microk8s kubectl apply -f ./src/backend/db/location_tracker_db/lt-postgres-configmap.yaml
-microk8s kubectl apply -f ./src/backend/db/location_tracker_db/lt-postgres-pv-claim.yaml
+# Location Tracker DB
 microk8s kubectl apply -f ./src/backend/db/location_tracker_db/lt-psql-persistant-volume.yaml
+microk8s kubectl apply -f ./src/backend/db/location_tracker_db/lt-postgres-pv-claim.yaml
+microk8s kubectl apply -f ./src/backend/db/location_tracker_db/lt-postgres-configmap.yaml
 microk8s kubectl apply -f ./src/backend/db/location_tracker_db/lt-ps-deployment.yaml
 microk8s kubectl apply -f ./src/backend/db/location_tracker_db/lt-ps-service.yaml
 
-microk8s kubectl apply -f ./src/backend/db/central_director_db/cd-postgres-configmap.yaml
-microk8s kubectl apply -f ./src/backend/db/central_director_db/cd-postgres-pv-claim.yaml
+# Central Director DB
 microk8s kubectl apply -f ./src/backend/db/central_director_db/cd-psql-persistant-volume.yaml
+microk8s kubectl apply -f ./src/backend/db/central_director_db/cd-postgres-pv-claim.yaml
+microk8s kubectl apply -f ./src/backend/db/central_director_db/cd-postgres-configmap.yaml
 microk8s kubectl apply -f ./src/backend/db/central_director_db/cd-ps-deployment.yaml
 microk8s kubectl apply -f ./src/backend/db/central_director_db/cd-ps-service.yaml
 
@@ -99,6 +98,8 @@ jq -c '.[]' vehicles.json | while read -r record; do
     envsubst < ./src/vehicle/distance_monitor/deployment.yaml | microk8s kubectl apply -f -
     envsubst < ./src/vehicle/distance_monitor/service.yaml | microk8s kubectl apply -f -
 
+    envsubst < ./src/backend/distance_monitor/deployment.yaml | microk8s kubectl apply -f -
+
     envsubst < ./src/vehicle/emergency_brake/deployment.yaml | microk8s kubectl apply -f -
     envsubst < ./src/vehicle/emergency_brake/service.yaml | microk8s kubectl apply -f -
 
@@ -111,10 +112,12 @@ microk8s kubectl apply -f ./configuration/
 echo "apply deployment files"
 microk8s kubectl apply -f ./src/backend/location_tracker/deployment.yaml
 microk8s kubectl apply -f ./src/backend/rabbit_mq/rabbit_mq.yaml
+microk8s kubectl apply -f ./src/backend/distance_monitor/deployment.yaml
+
 microk8s kubectl apply -f ./src/vehicle/data_mock/deployment.yaml
 microk8s kubectl apply -f ./src/vehicle/data_mock/service.yaml
 
-microk8s kubectl apply -f ./src/vehicle/central_director/cd-deployment.yaml
+microk8s kubectl apply -f ./src/backend/central_director/service.yaml
 
 microk8s kubectl apply -f ./src/passenger/deployment.yaml
 microk8s kubectl apply -f ./src/frontend/deployment.yaml
@@ -142,6 +145,7 @@ microk8s kubectl apply -f ./src/backend/location_tracker/service.yaml
 echo "==================== RESTARTING DEPLOYMENTS ===================="
 # Restart all deployments to ensure latest images
 microk8s kubectl rollout restart deployment/location-tracker
+microk8s kubectl rollout restart deployment/backend-distance-monitor
 microk8s kubectl rollout restart deployment/data-mock
 microk8s kubectl rollout restart deployment/passenger
 microk8s kubectl rollout restart deployment/visor
@@ -156,26 +160,24 @@ jq -c '.[]' vehicles.json | while read -r record; do
     microk8s kubectl rollout restart deployment/emergency-brake-"$VIN_LOWER"
 done
 
+echo "==================== WAITING FOR DEPLOYMENTS TO BE READY ===================="
+microk8s kubectl wait --for=condition=available --timeout=300s deployment/visor
+echo "Giving the cluster a moment to stabilize..."
+sleep 5
+
 echo "==================== SETTING UP PORT FORWARDS ===================="
-# Setup port forwarding for Grafana
+# Setup port forwarding for Grafana in the background
 microk8s kubectl port-forward svc/loki-grafana -n monitoring 3000:80 &
 
-# Setup port forwarding for Visor (if using LoadBalancer)
-microk8s kubectl port-forward svc/visor-service 8080:80 &
-
+# The final command will run in the foreground, keeping the script and the connection alive.
 echo "==================== DEPLOYMENT COMPLETE ===================="
-echo "Deployment completed at $(date)"
 echo ""
 echo "Access points:"
 echo "- Visor (Frontend): http://localhost:8080"
 echo "- Grafana: http://localhost:3000"
-echo "  Username: admin"
-echo -n "  Password: "
-kubectl get secret -n monitoring loki-grafana -o jsonpath="{.data.admin-password}" | base64 --decode
+echo "  (Use a separate terminal to get the Grafana password if needed via 'kubectl get secret ...')"
 echo ""
+echo ">>> Port-forwarding for Visor is now active in this terminal."
+echo ">>> Press CTRL+C to stop."
 echo ""
-echo "To check deployment status:"
-echo "  microk8s kubectl get pods --all-namespaces"
-echo ""
-echo "To view logs:"
-echo "  microk8s kubectl logs -f deployment/[deployment-name]"
+microk8s kubectl port-forward svc/visor-service 8080:80
