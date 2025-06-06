@@ -5,6 +5,5 @@ metadata:
 data:
   BROKER_EXCHANGE: "broker"
   DISTANCE_MONITOR_BACKEND: "backend.{vin}.distance.monitor"
-  LOCATION_TRACKER_BACKEND: "backend.location.tracker"
   CENTRAL_DIRECTOR_BACKEND: "backend.central.director"
   EMERGENCY_BRAKE_FRONTEND: "vehicle.{vin}.emergency.break"

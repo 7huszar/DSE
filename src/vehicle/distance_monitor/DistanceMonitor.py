@@ -59,12 +59,12 @@ class DistanceMonitorService(BaseSenderService):
             }
             self.channel.basic_publish(
                 exchange='broker',
-                routing_key=f'backend.{self.vin.upper()}.distance.monitor',
+                routing_key="visor.distance",
                 body=json.dumps(new_data).encode("utf-8")
             )
 
         except (AMQPConnectionError, AMQPChannelError) as e:
-            self.logger.warning(f"Failed to send message to broker with routing key: 'backend.location.distance_monitor' because of connection/channel error: {repr(e)}")
+            self.logger.warning(f"Failed to send message to broker with routing key: 'visor.distance' because of connection/channel error: {repr(e)}")
             self.retry_queue.put(data)
             with self.connection_dead:
                 self.connection_dead.notify_all()
