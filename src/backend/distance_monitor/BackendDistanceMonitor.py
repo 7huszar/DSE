@@ -71,7 +71,12 @@ def vehicle_dm_callback(ch, method, properties, body):
             logger.error(f"Error sending data to Central Director: {e}")
 
         # --- Forward raw data to Passenger for real-time Visor display ---
-        display_data = {'vin': vin, 'frontDistance': dst_front, 'speed': data.get('speed', 0)}
+        display_data = {
+            'vin': vin,
+            'frontDistance': dst_front,
+            'speed': data.get('speed', 0),
+            'emergencyBrake': data.get('emergencyBrake', False)
+        }
         ch.basic_publish(
             exchange='broker',
             routing_key='backend.location.passenger',

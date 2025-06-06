@@ -260,7 +260,7 @@
                     <div class="vehicle-info">
                         <div class="info-item">
                             <span class="info-label">Speed</span>
-                            <span class="info-value">{{ vehicle.speed }} km/h</span>
+                            <span class="info-value">{{ formatSpeed(vehicle.speed) }} km/h</span>
                         </div>
                         <div class="info-item">
                             <span class="info-label">Location</span>
@@ -500,6 +500,15 @@
                     return '-';
                 }
                 return `${location.lat.toFixed(5)}, ${location.lng.toFixed(5)}`;
+            },
+
+            formatSpeed(speed) {
+                // Check if the input is a valid number.
+                if (typeof speed !== 'number' || isNaN(speed)) {
+                    return '-'; // Return a dash if not valid.
+                }
+                // Format the number to 2 decimal places and add the unit.
+                return `${speed.toFixed(2)} km/h`;
             },
 
             formatDistance(distance) {
