@@ -27,9 +27,6 @@ microk8s enable storage
 echo "==================== APPLYING PLUGINS ===================="
 microk8s kubectl apply -f "https://github.com/rabbitmq/cluster-operator/releases/latest/download/cluster-operator.yml"
 
-microk8s kubectl apply -f ./src/backend/rabbit_mq/rabbit_mq.yaml
-microk8s kubectl apply -f ./src/backend/rabbit_mq/rabbitmq-configmap.yaml
-
 # Setup monitoring
 echo "==================== SETTING UP MONITORING ===================="
 microk8s helm3 repo add grafana https://grafana.github.io/helm-charts
@@ -137,12 +134,10 @@ microk8s kubectl apply -f ./src/backend/db/location_tracker_db/lt-ps-deployment.
 microk8s kubectl apply -f ./src/backend/db/location_tracker_db/lt-ps-service.yaml
 
 echo "apply configmaps"
-microk8s kubectl apply -f ./src/backend/rabbit_mq/rabbitmq-configmap.yaml
 microk8s kubectl apply -f ./src/backend/location_tracker/location-tracker-configmap.yaml
 
 echo "apply service files"
 microk8s kubectl apply -f ./src/backend/location_tracker/service.yaml
-microk8s kubectl apply -f ./src/broker/service.yaml
 
 echo "==================== RESTARTING DEPLOYMENTS ===================="
 # Restart all deployments to ensure latest images
