@@ -53,7 +53,7 @@ class DistanceMonitorService(BaseSenderService):
             }
             self.channel.basic_publish(
                 exchange='broker',
-                routing_key='backend.location.distance_monitor',
+                routing_key=f'backend.{self.vin.upper()}.distance.monitor',
                 body=json.dumps(new_data).encode("utf-8")
             )
 
