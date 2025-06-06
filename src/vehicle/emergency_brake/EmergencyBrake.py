@@ -91,8 +91,6 @@ class EmergencyBrake(BaseRabbitMqConnection):
 
 
     def run(self):
-        super().run()
-
         self.channel.queue_bind(exchange='broker', queue=self.queue_name, routing_key='vehicle.emergency_break')
         self.consumer_thread.start()
         self.flask_thread.start()
