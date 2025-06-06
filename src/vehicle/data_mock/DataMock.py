@@ -107,7 +107,7 @@ def update_car(vehicle):
     data_loc = {
             "vin": vehicle.vin,
             "lat": float(new_coord["lat"]),
-            "long": float(new_coord["long"]),
+            "lon": float(new_coord["lon"]),
             "time": float(new_coord["internal_time"]),
             "speed": vehicle.velocity * 3.6
     }
