@@ -20,6 +20,7 @@ microk8s enable dashboard
 microk8s enable registry
 microk8s enable dns
 microk8s enable storage
+microk8s enable metallb
 
 echo "==================== APPLYING PLUGINS ===================="
 microk8s kubectl apply -f "https://github.com/rabbitmq/cluster-operator/releases/latest/download/cluster-operator.yml"
@@ -165,9 +166,9 @@ jq -c '.[]' vehicles.json | while read -r record; do
 done
 
 echo "==================== WAITING FOR DEPLOYMENTS TO BE READY ===================="
-# Wait for the visor deployment to have at least one replica available.
-echo "Waiting for Visor service to be ready..."
 microk8s kubectl wait --for=condition=available --timeout=300s deployment/visor
+echo "Giving the cluster a moment to stabilize..."
+sleep 5
 
 echo "==================== SETTING UP PORT FORWARDS ===================="
 # Setup port forwarding for Grafana in the background
