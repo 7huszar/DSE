@@ -7,16 +7,14 @@ def compute_dst_front(vehicle: Vehicle) -> float:
     # x = longitude
     # y = latitude
 
-    dir = vehicle.direction
-
-    ped = np.array([48.235270, 16.381342])
+    ped = np.array([16.381342, 48.235270])
     v = np.array([vehicle.longitude, vehicle.latitude])
 
     to_ped = ped - v
 
-    dot_prod = np.dot(dir, to_ped)
+    dot_prod = np.dot(vehicle.direction, to_ped)
 
-    if dot_prod < 0:
-        return haversine(ped, v, unit=Unit.METERS)
-    else:
-        return np.random.uniform(50, 60)
+#    if dot_prod < 0:
+    return haversine(ped, v, unit=Unit.METERS)
+#    else:
+#        return np.random.uniform(50, 60)

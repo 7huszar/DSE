@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: emergency-brake
+  name: emergency-brake-${VIN_LOWER}
 spec:
   replicas: 1
   selector:
@@ -30,3 +30,5 @@ spec:
               value: "rabbitmq"
             - name: RABBITMQ_PORT
               value: "5672"
+            - name: "VIN"
+              value: ${VIN}
