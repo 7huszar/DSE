@@ -30,6 +30,12 @@ _idx_by_vin: Dict[str, int] = defaultdict(int)
 _last_pos: Dict[str, Tuple[float, float]] = {}
 _slow_parked: bool = False
 
+vehicles = {}
+
+def set_all_vehicles(vehicles_input):
+    global vehicles
+    vehicles = vehicles_input
+
 def _bearing_and_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> Tuple[float, float]:
     """Return (bearing°, distance m) on WGS‑84 from *p1* to *p2*."""
     inv = Geodesic.WGS84.Inverse(lat1, lon1, lat2, lon2)
@@ -72,17 +78,22 @@ def mess_with_vehicle(vehicle: Vehicle) -> None:
 
 
 def compute_dst_front(vehicle: Vehicle) -> float:
-    if vehicle.vin == FAST_VIN and SLOW_VIN in _last_pos:
+    global vehicles
+    if vehicle.vin == FAST_VIN:
+        slow_vehicle = vehicles[SLOW_VIN]
         _, dist = _bearing_and_distance(
             vehicle.latitude,
             vehicle.longitude,
-            *_last_pos[SLOW_VIN],
+            slow_vehicle.latitude,
+            slow_vehicle.longitude
         )
         return dist
-    elif vehicle.vin == FAST_VIN:
-        return 50.0
 
+    return uniform(10.0, 20.0)
+
+def compute_dst_back(vehicle: Vehicle) -> float:
+    global vehicles
     if vehicle.vin == SLOW_VIN:
-        return uniform(10.0, 20.0)
+        return compute_dst_front(vehicles[FAST_VIN])
 
-    return 0.0
+    return uniform(15.0, 20.0)

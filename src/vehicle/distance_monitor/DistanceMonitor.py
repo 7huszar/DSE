@@ -68,6 +68,7 @@ class DistanceMonitorService(BaseSenderService):
             new_data = {
                 "vin": data["vin"],
                 "dst_front": data["dst_front"],
+                "dst_rear": data["dst_rear"],
                 "time": data["time"],
                 "change_rate": self.change_rate
             }
