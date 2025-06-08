@@ -33,19 +33,6 @@ class LocationSenderService(BaseSenderService):
             with self.connection_dead:
                 self.connection_dead.notify_all()
 
-        try:
-            self.channel.basic_publish(
-                exchange='broker',
-                routing_key='backend.location.passenger',
-                body=json.dumps(data).encode("utf-8")
-            )
-
-        except (AMQPConnectionError, AMQPChannelError) as e:
-            self.logger.warning(f"Failed to send message to broker with routing key: 'backend.location.passenger' because of connection/channel error: {repr(e)}")
-            self.retry_queue.put(data)
-            with self.connection_dead:
-                self.connection_dead.notify_all()
-
         return jsonify({"status": "ok"}), 200
 
     def get_retry_routing_key(self):
