@@ -11,12 +11,12 @@ pkill -f "kubectl port-forward svc/visor-service 8080:80" \
 echo "==================== STEEER DEPLOYMENT SCRIPT ===================="
 echo "Starting deployment at $(date)"
 
-#echo "==================== RUNNING TESTS ===================="
-#python3 -m pytest src/tests/ -v || {
-#    echo "ERROR: Tests failed! Aborting deployment."
-#    exit 1
-#}
-#echo "Tests passed! Continuing with deployment..."
+echo "==================== RUNNING TESTS ===================="
+python3 -m pytest src/tests/ -v || {
+    echo "ERROR: Tests failed! Aborting deployment."
+    exit 1
+}
+echo "Tests passed! Continuing with deployment..."
 
 echo "==================== ENABLING PLUGINS ===================="
 microk8s enable helm3
