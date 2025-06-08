@@ -65,6 +65,10 @@
                             <div class="info-label">Front Distance</div>
                             <div class="distance-value">{{ formatDistance(vehicle.frontDistance) }}</div>
                         </div>
+                        <div class="info-item">
+                            <span class="info-label">Change Rate</span>
+                            <div class="info-value">{{ formatChangeRate(vehicle.change_rate) }}</div>
+                        </div>
                     </div>
                     <button class="emergency-button" @click="triggerEmergencyBrake(vehicle.vin)">
                         🚨 Trigger Emergency Brake
@@ -210,6 +214,7 @@
                 }
                 if (typeof v.dst_front !== 'undefined') v.frontDistance = v.dst_front;
                 if (typeof v.dst_back  !== 'undefined') v.rearDistance  = v.dst_back;
+                if (typeof v.changeRate !== 'undefined') v.changeRate = v.change_rate
 
                 return v;
             },
@@ -318,6 +323,14 @@
                 }
                 // Format the number to 2 decimal places and add the unit.
                 return `${distance.toFixed(2)} m`;
+            },
+            formatChangeRate(changeRate) {
+                // Check if the input is a valid number.
+                if (typeof changeRate !== 'number' || isNaN(changeRate)) {
+                    return '-'; // Return a dash if not valid.
+                }
+                // Format the number to 2 decimal places and add the unit.
+                return `${changeRate.toFixed(2)} m/s`;
             },
 
             async triggerEmergencyBrake(vin) {

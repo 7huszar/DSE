@@ -49,6 +49,7 @@ class Bridge(BaseRabbitMqConnection):
         elif method.routing_key == self.visor_dst_rk:                                                   # visor.distance
             v["frontDistance"] = data.get("dst_front")
             v["rearDistance"]  = data.get("dst_back")
+            v["change_rate"] = data.get("change_rate")
         else:
             v["rsn"] = data.get("rsn")
             v["src"] = data.get("src")
