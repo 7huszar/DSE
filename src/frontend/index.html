@@ -101,7 +101,7 @@
             map: null,
             markers: {},
             ws: null,
-            apiUrl: '/api'
+            baseUrl: 'passenger-service'
         },
         mounted() {
             this.initializeMap();
@@ -165,7 +165,7 @@
 
             async fetchVehicleData() {
                 try {
-                    const response = await fetch(this.apiUrl + '/vehicles');
+                    const response = await fetch(this.baseUrl + '/vehicles');
                     if (response.ok) {
                         const rawVehicles = await response.json();
                         console.log('Fetched vehicles via HTTP /vehicles:', rawVehicles);
@@ -300,7 +300,7 @@
 
             async triggerEmergencyBrake(vin) {
                 try {
-                    const response = await fetch(this.apiUrl + '/emergency-brake', {
+                    const response = await fetch(this.baseUrl +  '/central-director/emergency/' + vin, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json'
