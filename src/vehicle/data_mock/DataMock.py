@@ -106,14 +106,11 @@ def send_data(addr: str, data):
 
 
 def update_car(vehicle):
-    #Update vehicle position and send data
-
-    scenario_module.mess_with_vehicle(vehicle)
-
     # Get new position
     new_coord = vehicle.sample()
 
     front_dst = scenario_module.compute_dst_front(vehicle)
+    rear_dst = scenario_module.compute_dst_back(vehicle)
 
     data_loc = {
             "vin": vehicle.vin,
@@ -131,6 +128,7 @@ def update_car(vehicle):
     data_mon = {
         "vin": vehicle.vin,
         "dst_front": front_dst,
+        "dst_rear": rear_dst,
         "speed": vehicle.velocity * 3.6,
         "time": datetime.fromtimestamp(float(new_coord["internal_time"])).isoformat(timespec="microseconds")
     }
@@ -150,7 +148,10 @@ def update_car(vehicle):
 def background_loop():
     #Run update operation in seperate thread to enable the processing of HTTP requests
     logger.info("Starting background data loop...")
+    scenario_module.set_all_vehicles(vehicles)
     while True:
+        for vehicle in vehicles.values():
+            scenario_module.mess_with_vehicle(vehicle)
         for vehicle in vehicles.values():
             update_car(vehicle)
         time.sleep(SAMPLING_TIME)
