@@ -1,3 +1,5 @@
+
+
 from datetime import datetime, timezone
 import json
 import os
@@ -59,9 +61,9 @@ class DistanceMonitorService(BaseSenderService):
             #If it is deployed in the vehicle, send emergency brake command to vehicle service via HTTP. Otherwise to the central director
             self.logger.info(trigger_data["rsn"])
             if os.environ.get("SERVICE_DEPLOYMENT_LOCATION") == "vehicle":
-                self.send_data(f"http://emergency-brake-{self.vin.lower()}/trigger", trigger_data)
+                self.send_data(os.environ.get("EMERGENCY_BRAKE_BASE_URI").format(vin=self.vin.lower()), trigger_data)
             if os.environ.get("SERVICE_DEPLOYMENT_LOCATION") == "backend":
-                self.send_data(f"http://central-director-service/emergency", trigger_data)
+                self.send_data(os.environ.get("CENTRAL_DIRECTOR_URI"), trigger_data)
 
         try:
             #Send distance data via RabbitMQ to the frontend visor to display there
