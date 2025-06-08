@@ -50,6 +50,7 @@ class Bridge(BaseRabbitMqConnection):
             v["frontDistance"] = data.get("dst_front")
             v["rearDistance"]  = data.get("dst_rear")
             v["change_rate"] = data.get("change_rate")
+            v["speed"] = data.get("speed")
         else:
             v["rsn"] = data.get("rsn")
             v["src"] = data.get("src")

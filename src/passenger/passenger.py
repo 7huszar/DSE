@@ -116,7 +116,7 @@ async def get_central_director_logs() -> List[RetrieveLogsResponse]:
         response = await client.get(CENTRAL_DIRECTOR_URI + "events")
         response.raise_for_status()
         data = response.json()
-        return [RetrieveLogsResponse(**log) for log in data]
+        return [RetrieveLogsResponse(**log) for log in data.get("events")]
     except httpx.HTTPError as e:
         logger.error(f"Central Director error: {str(e)}")
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"{e}")

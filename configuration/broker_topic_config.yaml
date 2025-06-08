@@ -6,7 +6,7 @@ data:
   BROKER_EXCHANGE: "broker"
   DISTANCE_MONITOR_BACKEND: "backend.{vin}.distance.monitor"
   CENTRAL_DIRECTOR_BACKEND: "backend.central.director"
-  EMERGENCY_BRAKE_FRONTEND: "vehicle.{vin}.emergency.break"
+  EMERGENCY_BRAKE: "vehicle.{vin}.emergency.break"
   VISOR_LOCATION: "visor.location"
   VISOR_DISTANCE: "visor.distance"
   VISOR_EMERGENCY_BRAKE: "visor.emergency.brake"

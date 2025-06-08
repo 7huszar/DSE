@@ -31,6 +31,8 @@ class EmergencyBrake(BaseRabbitMqConnection):
         self.consumer_connection = None
         self.consumer_channel = None
 
+        self.central_director_rk = os.getenv("CENTRAL_DIRECTOR_BACKEND", "backend.central.director")
+
         self.app.add_url_rule("/trigger", view_func=self.brake, methods=["POST"])
 
         super().run()
@@ -92,6 +94,18 @@ class EmergencyBrake(BaseRabbitMqConnection):
         try:
             self.channel.basic_publish(
                 exchange='broker',
+                routing_key=self.central_director_rk,
+                body=json.dumps(data).encode("utf-8")
+            )
+        except (AMQPConnectionError, AMQPChannelError) as e:
+            self.logger.warning(f"Failed to send message to broker with routing key: 'backend.location.distance_monitor' because of connection/channel error: {repr(e)}")
+            self.retry_queue.put(data)
+            with self.connection_dead:
+                self.connection_dead.notify_all()
+
+        try:
+            self.channel.basic_publish(
+                exchange='broker',
                 routing_key='visor.emergency.brake',
                 body=json.dumps(data).encode("utf-8")
             )
@@ -100,6 +114,7 @@ class EmergencyBrake(BaseRabbitMqConnection):
             self.retry_queue.put(data)
             with self.connection_dead:
                 self.connection_dead.notify_all()
+
 
 
     def run(self):
