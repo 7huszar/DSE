@@ -65,3 +65,32 @@ class RetrieveLogsResponse(BaseModel):
         description="Unique id of a vehicle.",
         examples=["4A3AK24FX6E028812"]
     )
+
+class LocationTrackerResponse(BaseModel):
+    vin: str = Field(
+        title="Vehicle VIN",
+        description="Unique identifier of the vehicle.",
+        examples=["4A3AK24FX6E028812"]
+    )
+    latitude: float = Field(
+        title="Latitude",
+        description="Last known latitude in decimal degrees.",
+        examples=["48.236653"]
+    )
+    longitude: float = Field(
+        title="Longitude",
+        description="Last known longitude in decimal degrees.",
+        examples=["16.379773"]
+    )
+    timestamp: str = Field(
+        title="Timestamp",
+        description="UTC ISO-8601 with microseconds timestamp of when the location was recorded.",
+        examples=["2025-06-05T12:34:56.123456+00:00"]
+    )
+
+class HealthResponse(BaseModel):
+    msg: str = Field(
+        title="Health message",
+        description="Indicates that the Passenger API gateway is running.",
+        examples=["Passenger API gateway works!"]
+    )

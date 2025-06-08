@@ -1,11 +1,12 @@
 from typing import List
 
-from fastapi import FastAPI, Request, Path, Body, status, HTTPException, Response, Query
+from fastapi import FastAPI, Path, Body, status, HTTPException, Response, Query
 from fastapi.middleware.cors import CORSMiddleware
 import httpx
 import logging
 
-from passenger_base_models import EmergencyTriggerRequest, EmergencyTriggerResponse, RetrieveLogsResponse
+from passenger_base_models import EmergencyTriggerRequest, EmergencyTriggerResponse, RetrieveLogsResponse, \
+    LocationTrackerResponse, HealthResponse
 
 # Constants
 
@@ -41,35 +42,75 @@ client = httpx.AsyncClient(timeout=10)
 
 # This microservice implements the passenger API Gateway
 
-@app.get("/")
-async def getHealth():
-    return {"msg": "Passenger API gateway works!"}
+@app.get(
+    "/",
+    summary="Health check",
+    description="Returns a simple message to indicate that the Passenger API gateway is up and running.",
+    response_model=HealthResponse,
+    status_code=status.HTTP_200_OK,
+    responses={
+        200: {
+            "description": "Service is healthy",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "msg": "Passenger API gateway works!"
+                    }
+                }
+            }
+        }
+    },
+    tags=["Health"],
+)
+async def get_health() -> HealthResponse:
+    """
+    Simple health-check endpoint:
 
+    - Returns HTTP 200 with a JSON body confirming service availability.
+    """
+    return HealthResponse(msg="Passenger API gateway works!")
 @app.get("/location_tracker/{vin}")
-async def location_tracker(vin):
-    logger.info(f"Received GET request for location tracker for VIN {vin}")
+async def location_tracker(vin: str = Path(
+    title="Vehicle Identification Number",
+    description="Unique id of vehicle."
+)) -> List[LocationTrackerResponse]:
+    logger.info(f"Received request for location tracker for VIN {vin}")
     try:
         response = await client.post(LOCATION_TRACKER_URI + "database", json={"vin": vin})
         response.raise_for_status()
-        return response.json()
+        return [LocationTrackerResponse(**loc) for loc in response.json()]
     except httpx.HTTPError as e:
-        logger.error(f"Location Tracker error: {str(e)}")
-        return {"error": str(e)}
+        logger.error(f"Passenger API Gateway error: {str(e)}")
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"{e}")
 
 @app.get("/central-director/logs",
          summary="Retrieve logs from db.",
          description="Retrieves logs from db up to limit.",
          status_code=status.HTTP_200_OK,
+         responses={
+             200: {
+                 "description": "List of log entries.",
+                 "content": {
+                     "application/json": {
+                         "examples": {
+                             "SampleLog": {
+                                 "summary": "Example log entry",
+                                 "value": {
+                                     "src": "distance-monitor-xyz-backend",
+                                     "rsn": "Vehicles approaching another object on streets too fast with a frontal distance of 5.01m and a change rate of 7.21m/s.",
+                                     "time": "2025-06-05T12:34:56.123456+00:00",
+                                     "vin": "4A3AK24FX6E028812"
+                                 }
+                             }
+                         }
+                     }
+                 }
+             }
+         }
          )
-async def get_central_director_logs(
-        limit: int = Query(
-        100,
-        title="Maximum number of logs",
-        description="How many log entries to retrieve (>1)",
-        ge=1,
-        example=50)) -> List[RetrieveLogsResponse]:
+async def get_central_director_logs() -> List[RetrieveLogsResponse]:
 
-    logger.info(f"Received GET request for central director logs with limit {limit}")
+    logger.info("Received GET request for central director logs")
 
     try:
         response = await client.get(CENTRAL_DIRECTOR_URI + "events")

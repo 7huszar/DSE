@@ -145,9 +145,9 @@ def get_events():
         conn = get_db_connection()
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute("""
-                SELECT vin, timestamp, source, reason
+                SELECT vin, time, src, rsn
                 FROM emergency_events
-                ORDER BY timestamp DESC
+                ORDER BY time DESC
                 LIMIT 50
             """)
             events = cur.fetchall()
