@@ -20,20 +20,6 @@ spec:
           imagePullPolicy: Always
           ports:
             - containerPort: 8080
-          envFrom:
-            - configMapRef:
-                name: rabbit-mq-configmap # Provides RABBITMQ_HOST, RABBITMQ_PORT
-          env:
-            - name: RABBITMQ_USER
-              valueFrom:
-                secretKeyRef:
-                  name: rabbitmq-default-user # Name of the Secret for RabbitMQ username
-                  key: username              # Key in the Secret for the username
-            - name: RABBITMQ_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: rabbitmq-default-user # Name of the Secret for RabbitMQ password
-                  key: password              # Key in the Secret for the password
 ---
 apiVersion: v1
 kind: Service
