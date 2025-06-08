@@ -49,9 +49,9 @@ def init_database():
             CREATE TABLE IF NOT EXISTS emergency_events (
                 id SERIAL PRIMARY KEY,
                 vin VARCHAR(20) NOT NULL,
-                timestamp TIMESTAMPTZ NOT NULL,
-                source VARCHAR(50),
-                reason VARCHAR (50)
+                time TIMESTAMPTZ NOT NULL,
+                src VARCHAR(255),
+                rsn VARCHAR (255)
             )
         """)
         conn.commit()
@@ -134,7 +134,7 @@ def emergency_request(vin):
         # This is the new action
         trigger_emergency_brake_on_vehicle(vin=vin, src=data.get("src"), rsn=data.get("rsn"))
 
-        return jsonify({"status": "ok, command sent"}), 200
+        return jsonify({"status": "ok, command sent", time: datetime.now(timezone.utc).isoformat(timespec="microseconds")}), 200
     except Exception as e:
         logger.error(f"Error processing emergency request: {e}", exc_info=True)
         return jsonify({"error": "Internal Server Error"}), 500
@@ -145,9 +145,9 @@ def get_events():
         conn = get_db_connection()
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute("""
-                SELECT vin, timestamp, source, reason
+                SELECT vin, time, src, rsn
                 FROM emergency_events
-                ORDER BY timestamp DESC
+                ORDER BY time DESC
                 LIMIT 50
             """)
             events = cur.fetchall()
