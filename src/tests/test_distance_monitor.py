@@ -54,7 +54,8 @@ class TestDistanceMonitorServiceREST(unittest.TestCase):
             "vin": "TESTVIN123",
             "dst_front": 1.0,
             "dst_rear": 10.0,
-            "time": "2025-06-08T12:00:01.000000+00:00"
+            "time": "2025-06-08T12:00:01.000000+00:00",
+            "speed":8000
         }
 
         # Send POST to test client
@@ -99,7 +100,8 @@ class TestDistanceMonitorServiceREST(unittest.TestCase):
             "vin": "TESTVIN123",
             "dst_front": 1.0,
             "dst_rear": 10.0,
-            "time": "2025-06-08T12:00:01.000000+00:00"
+            "time": "2025-06-08T12:00:01.000000+00:00",
+            "speed":8000
         }
 
         # Send POST to test client
@@ -133,7 +135,8 @@ class TestDistanceMonitorServiceREST(unittest.TestCase):
             "vin": "TESTVIN123",
             "dst_front": 1.0,
             "dst_rear": 10.0,
-            "time": "2025-06-08T12:00:01.000000+00:00"
+            "time": "2025-06-08T12:00:01.000000+00:00",
+            "speed":8000
         }
 
         # Send POST to test client
@@ -147,7 +150,7 @@ class TestDistanceMonitorServiceREST(unittest.TestCase):
 
         #Assert that the correct endpoint was called
         called_url = mock_requests_post.call_args[0][0]
-        self.assertEqual(called_url, "http://fake_central_director:80/emergency")
+        self.assertEqual(called_url, "http://fake_central_director:80/emergency/testvin123")
 
         print("Emergency brake REST backend endpoint was correctly called.")
 
