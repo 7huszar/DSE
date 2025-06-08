@@ -89,7 +89,7 @@ class EmergencyBrake(BaseRabbitMqConnection):
         try:
             self.channel.basic_publish(
                 exchange='broker',
-                routing_key='backend.location.tracker',
+                routing_key='visor.emergency.brake',
                 body=json.dumps(data).encode("utf-8")
             )
         except (AMQPConnectionError, AMQPChannelError) as e:
@@ -133,7 +133,6 @@ class EmergencyBrake(BaseRabbitMqConnection):
             raise RuntimeError('Not running with the Werkzeug Server')
         func()
         return 'Server shutting down...', 200
-
 
     def shutdown(self):
         try:

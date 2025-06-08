@@ -160,6 +160,4 @@ def get_events():
 if __name__ == '__main__':
     # Initialize the database before starting the web server
     init_database()
-
-
     app.run(host='0.0.0.0', port=5000, debug=False)

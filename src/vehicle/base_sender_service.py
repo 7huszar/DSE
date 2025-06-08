@@ -3,7 +3,6 @@ import os
 
 import requests
 from flask import Flask, request
-from pika.exceptions import AMQPConnectionError, AMQPChannelError
 
 from src.vehicle.base_rabbitmq_connection import BaseRabbitMqConnection
 
