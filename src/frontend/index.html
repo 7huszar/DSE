@@ -61,10 +61,6 @@
                             <span class="info-label">Rear Distance</span>
                             <span class="info-value">{{ formatDistance(vehicle.rearDistance) }}</span>
                         </div>
-                        <div class="distance-highlight" v-if="vehicle.frontDistance">
-                            <div class="info-label">Front Distance</div>
-                            <div class="distance-value">{{ formatDistance(vehicle.frontDistance) }}</div>
-                        </div>
                         <div class="info-item">
                             <span class="info-label">Change Rate</span>
                             <div class="info-value">{{ formatChangeRate(vehicle.change_rate) }}</div>
