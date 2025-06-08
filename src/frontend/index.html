@@ -148,6 +148,29 @@
                         this.handleRealtimeUpdate(vehicleDataFromServer);
                     });
 
+                    this.ws.on('event', (event) => {
+                        console.log('Socket.IO: Event occurred:', event);
+                        const iso = event.time.replace(/(\.\d{3})\d+Z$/, '$1Z');
+
+                        const dt = new Date(iso);
+
+                        const formatted = dt.toLocaleString(undefined, {
+                            year:   'numeric',
+                            month:  'short',    // e.g. "Jun"
+                            day:    'numeric',
+                            hour:   '2-digit',
+                            minute: '2-digit',
+                            second: '2-digit',
+                            hour12: false       // or true for 12-hour clock
+                        });
+
+                        console.log('Formatted time:', formatted);
+                        this.addEvent(
+                            `Emergency brake triggered for vehicle ${event.vin}, ` +
+                            `Source: ${event.src}, reason: ${event.rsn} at ${formatted}`
+                        );
+                    })
+
                     // Handles the 'connected' event emitted by the passenger service on successful client connection
                     this.ws.on('connected', (serverAckData) => {
                         console.log('Socket.IO: Server sent "connected" event:', serverAckData);

@@ -78,7 +78,7 @@ def store_event(vin, source=None, reason=None):
         logger.error(f"Failed to store event for {vin}: {e}", exc_info=True)
 
 
-def trigger_emergency_brake_on_vehicle(vin):
+def trigger_emergency_brake_on_vehicle(vin: str, rsn: str, src):
     """Sends an HTTP request to the vehicle's Emergency Brake service."""
     logger.warning(f"ACTION: Triggering emergency brake for VIN {vin}.")
     RABBITMQ_USER = os.environ['RABBITMQ_USER']
@@ -104,7 +104,11 @@ def trigger_emergency_brake_on_vehicle(vin):
     routing_key = os.environ.get("EMERGENCY_BRAKE_FRONTEND").format(vin=vin.upper())
 
     logger.info(f"Routing key: {routing_key}")
-    body = {"time": time.time()}
+    body = {
+        "time": datetime.now(timezone.utc).isoformat(timespec="microseconds"),
+        "rsn": rsn,
+        "src": src
+    }
     consumer_channel.queue_declare('', exclusive=False)
     consumer_channel.exchange_declare(exchange=os.environ.get("BROKER_EXCHANGE"), exchange_type='topic', durable=True)
     consumer_channel.queue_bind('',exchange=os.environ.get("BROKER_EXCHANGE"), routing_key=routing_key)
@@ -129,7 +133,7 @@ def emergency_request():
         store_event(vin, source, reason)
 
         # This is the new action
-        trigger_emergency_brake_on_vehicle(vin)
+        trigger_emergency_brake_on_vehicle(vin=vin, src=data.get("src"), rsn=data.get("rsn"))
 
         return jsonify({"status": "ok, command sent"}), 200
     except Exception as e:

@@ -1,6 +1,6 @@
+from datetime import datetime, timezone
 import json
 import os
-import time
 
 import requests
 from flask import request, jsonify
@@ -12,7 +12,9 @@ class DistanceMonitorService(BaseSenderService):
 
     def __init__(self):
         self.change_rate = 0.0
+        self.delta_time = 1.0
         self.last_dst_front = 0.0
+        self.last_time: datetime = datetime.now(timezone.utc)
         self.vin: str = os.environ.get("VIN")
         super().__init__()
 
@@ -33,18 +35,24 @@ class DistanceMonitorService(BaseSenderService):
         data = request.get_json()
         self.logger.info(f"Received data: {str(data)}")
         dst_front = float(data["dst_front"])
+        time = datetime.fromisoformat(data["time"])
 
         if self.last_dst_front != 0.0:
-            self.change_rate = self.last_dst_front - dst_front
+            self.delta_time = (time - self.last_time).total_seconds()
+            self.change_rate = (self.last_dst_front - dst_front) / self.delta_time
+
         self.last_dst_front = dst_front
+        self.last_time = time
 
         self.logger.info(self.change_rate)
         if dst_front < 10.0 and self.change_rate > 4.0:
             trigger_data = {
-                "time": time.time(),
-                "vin": self.vin
+                "time": datetime.now(timezone.utc).isoformat(timespec="microseconds"),
+                "vin": self.vin,
+                "rsn": f"Vehicle approaching vehicle too fast: dst_front:{dst_front:.2f}m and change_rate:{self.change_rate:.2f}m/s",
+                "src": f"distance-monitor-" + self.vin.lower() + "-" + os.environ.get("SERVICE_DEPLOYMENT_LOCATION")
             }
-            self.logger.info(f"Trigger emergency brake, because frontal distance is {dst_front} < 16.0")
+            self.logger.info(trigger_data["rsn"])
             if os.environ.get("SERVICE_DEPLOYMENT_LOCATION") == "vehicle":
                 self.send_data(f"http://emergency-brake-{self.vin.lower()}/trigger", trigger_data)
             if os.environ.get("SERVICE_DEPLOYMENT_LOCATION") == "backend":

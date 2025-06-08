@@ -66,7 +66,8 @@ async def triggerEmergencyBrake(vin_lower):
             CENTRAL_DIRECTOR_URI + "emergency",
             json={
                 'vin': vin_lower,
-                'source': 'Frontend Manual Emergency Brake Trigger'
+                'src': 'Frontend Manual Emergency Brake Trigger',
+                'rsn': 'Visor App'
             }
         )
         response.raise_for_status()
