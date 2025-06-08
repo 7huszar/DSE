@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 import json
 import os
 import threading
@@ -87,7 +88,7 @@ async def trigger_break(vin):
     logger.info(f"Emergency break triggered for {vin}")
     vehicles.get(vin).velocity = 0.0
     vehicles[vin].acceleration = 0.0
-    return {"vin": vin, "time": time.time()}, 200
+    return {"vin": vin, "time": datetime.now(timezone.utc).isoformat(timespec="microseconds")}, 200
 
 def send_data(addr: str, data):
     #Sent data packages via HTTP
@@ -118,7 +119,7 @@ def update_car(vehicle):
             "vin": vehicle.vin,
             "lat": float(new_coord["lat"]),
             "lon": float(new_coord["lon"]),
-            "time": float(new_coord["internal_time"]),
+            "time": datetime.fromtimestamp(float(new_coord["internal_time"])).isoformat(timespec="microseconds"),
             "speed": vehicle.velocity * 3.6
     }
 
@@ -131,7 +132,7 @@ def update_car(vehicle):
         "vin": vehicle.vin,
         "dst_front": front_dst,
         "speed": vehicle.velocity * 3.6,
-        "time": time.time()
+        "time": datetime.fromtimestamp(float(new_coord["internal_time"])).isoformat(timespec="microseconds")
     }
 
 

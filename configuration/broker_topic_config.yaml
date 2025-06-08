@@ -9,3 +9,4 @@ data:
   EMERGENCY_BRAKE_FRONTEND: "vehicle.{vin}.emergency.break"
   VISOR_LOCATION: "visor.location"
   VISOR_DISTANCE: "visor.distance"
+  VISOR_EMERGENCY_BRAKE: "visor.emergency.brake"

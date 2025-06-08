@@ -23,7 +23,7 @@ class EmergencyBrake(BaseRabbitMqConnection):
         self.timout: float = float(os.getenv("TIMEOUT", 5))
         self.time_lock = threading.Lock()
         self.brake_lock = threading.Lock()
-        self.last_brake_time: float = 0
+        self.last_brake_time: datetime = datetime.fromtimestamp(0, timezone.utc)
 
         self.FLASK_HOST: str = os.environ.get("FLASK_HOST", "0.0.0.0")
         self.FLASK_PORT: int = int(os.environ.get("FLASK_PORT", 5000))
@@ -50,9 +50,9 @@ class EmergencyBrake(BaseRabbitMqConnection):
     def brake(self):
         self.logger.info(f"Requested emergency break by http request for {self.vin}")
         data = request.get_json()
-        return self.trigger_brake(data.get("time"))
+        return self.trigger_brake(time=datetime.fromisoformat(data.get("time")), src=data.get("src"), rsn=data.get("rsn"))
 
-    def trigger_brake(self, time):
+    def trigger_brake(self, time: datetime, src: str, rsn: str):
         #When the emergency brake it triggered, communicate it to the data mock to adjust coherent data output
         with self.brake_lock:
 
@@ -64,14 +64,13 @@ class EmergencyBrake(BaseRabbitMqConnection):
                 response = requests.post(self.addr, timeout=self.timout)
                 if response.ok:
                     with self.time_lock:
-                        self.last_brake_time = float(response.json().get("time"))
+                        self.last_brake_time = datetime.fromisoformat(response.json()[0].get("time"))
 
                     data = {
                         "vin": f"{self.vin.upper()}",
-                        "command": "emergency_stop",
-                        "reason": "Bc I can",
-                        "source": "test",
-                        "timestamp": datetime.now(timezone.utc).timestamp()
+                        "rsn": rsn,
+                        "src": src,
+                        "time": self.last_brake_time.isoformat(timespec="microseconds")
                     }
 
                     self.logger.info(f"Successful post request to {self.addr}. \nResponse status: {response.status_code}\n Response body: {response.text}")
@@ -87,8 +86,8 @@ class EmergencyBrake(BaseRabbitMqConnection):
             return jsonify({"status": "ok"}), 200
 
     def publish(self, data):
+        self.logger.info(f"Send ack of triggered emergency break. with {data}")
         #Publish emergency break invocation to the visor frontend using RabbitMQ
-        self.logger.info("Send ack of triggered emergency break.")
 
         try:
             self.channel.basic_publish(
@@ -110,7 +109,8 @@ class EmergencyBrake(BaseRabbitMqConnection):
 
     def callback(self, ch, method, properties, body):
         self.logger.info(f"Requested emergency brake by async rabbitmq for {self.vin}")
-        self.trigger_brake(json.loads(body.decode("utf-8")).get("time"))
+        data = json.loads(body.decode("utf-8"))
+        self.trigger_brake(time=datetime.fromisoformat(data.get("time")), rsn=data.get("rsn"), src=data.get("src"))
 
     def consume(self):
         #Listen for the emergency brake invocation from the central director. This gets published via RabbitMQ.
