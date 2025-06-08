@@ -90,6 +90,7 @@ async def trigger_break(vin):
     return {"vin": vin, "time": time.time()}, 200
 
 def send_data(addr: str, data):
+    #Sent data packages via HTTP
     logger.info(f"Send data to {addr} with body:{data}")
 
     try:
@@ -104,7 +105,7 @@ def send_data(addr: str, data):
 
 
 def update_car(vehicle):
-    """Update vehicle position and send data"""
+    #Update vehicle position and send data
 
     scenario_module.mess_with_vehicle(vehicle)
 
@@ -123,6 +124,7 @@ def update_car(vehicle):
 
     addr_loc = BASE_URI_LOC.format(vehicle.vin.lower())
 
+    #Send location data to vehicle location tracker, imitate GPS locator
     send_data(addr_loc, data_loc)
 
     data_mon = {
@@ -132,6 +134,11 @@ def update_car(vehicle):
         "time": time.time()
     }
 
+
+    #Send data to the vehicle and backend distance monitors, imitate sensor
+    #We send this to the backend distance monitor directly instead of throught the vehicle distance monitor because of fail safety and
+    #the assumption that the vehicle's sensor would do that before sending it to the vehicle distance monitor
+
     addr_mon_vehicle = BASE_URI_MON.format(vin=vehicle.vin.lower(), location="vehicle")
     addr_mon_backend = BASE_URI_MON.format(vin=vehicle.vin.lower(), location="backend")
     send_data(addr_mon_vehicle, data_mon)
@@ -140,6 +147,7 @@ def update_car(vehicle):
     logger.info("Sent data to distance monitor backend!")
 
 def background_loop():
+    #Run update operation in seperate thread to enable the processing of HTTP requests
     logger.info("Starting background data loop...")
     while True:
         for vehicle in vehicles.values():

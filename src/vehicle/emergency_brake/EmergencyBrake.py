@@ -10,6 +10,8 @@ from src.vehicle.base_rabbitmq_connection import BaseRabbitMqConnection
 from flask import Flask, jsonify, request
 import requests
 
+#This class implements the emergency brake service in the vehicle.
+
 class EmergencyBrake(BaseRabbitMqConnection):
 
     def __init__(self):
@@ -51,6 +53,7 @@ class EmergencyBrake(BaseRabbitMqConnection):
         return self.trigger_brake(data.get("time"))
 
     def trigger_brake(self, time):
+        #When the emergency brake it triggered, communicate it to the data mock to adjust coherent data output
         with self.brake_lock:
 
             with self.time_lock:
@@ -84,6 +87,7 @@ class EmergencyBrake(BaseRabbitMqConnection):
             return jsonify({"status": "ok"}), 200
 
     def publish(self, data):
+        #Publish emergency break invocation to the visor frontend using RabbitMQ
         self.logger.info("Send ack of triggered emergency break.")
 
         try:
@@ -109,6 +113,9 @@ class EmergencyBrake(BaseRabbitMqConnection):
         self.trigger_brake(json.loads(body.decode("utf-8")).get("time"))
 
     def consume(self):
+        #Listen for the emergency brake invocation from the central director. This gets published via RabbitMQ.
+        #This is necessary if the vehicles distance monitor service does not work and needs to be invoked redudantly by the backend.
+
         self.consumer_connection = self.get_rabbitmq_connection()
         self.consumer_channel = self.consumer_connection.channel()
 

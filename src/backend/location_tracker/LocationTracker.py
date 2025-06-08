@@ -39,7 +39,7 @@ logger.info("Location Tracker initialized.")
 
 
 def callback(ch, method, properties, body):
-
+    # Upon receiving a message from the cars location sender, store it into the database
     information = json.loads(body.decode('UTF-8'))
     logger.info(information)
     cur = conn.cursor()
@@ -50,7 +50,7 @@ def callback(ch, method, properties, body):
     logger.info('Message written to the db!')
 
 def run_consumer():
-    ##RabbitMQ initialization
+    #Run the rabbitMQ Consumer that consumes the location messages
     credentials = pika.PlainCredentials(username= os.environ['RABBITMQ_USER'], password=os.environ['RABBITMQ_PASSWORD'])
     connection = pika.BlockingConnection(pika.ConnectionParameters(host=os.environ['RABBITMQ_HOST'], port=os.environ['RABBITMQ_PORT'], credentials=credentials, virtual_host="/"))
 

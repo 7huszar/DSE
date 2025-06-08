@@ -4,21 +4,23 @@ from pika.exceptions import AMQPConnectionError, AMQPChannelError
 
 from src.vehicle.base_sender_service import BaseSenderService
 
+#This Service implements the Location Sender Service in the vehicle
 class LocationSenderService(BaseSenderService):
 
     def receive_data(self):
+        #Receive location data from data mock, as subsitute for real GPS locator
         data = request.get_json()
         self.logger.info(f"Received data: {str(data)}")
 
         try:
-            #Publish to backend location tracker
+            #Publish location to backend location tracker
             self.channel.basic_publish(
                 exchange='broker',
                 routing_key='backend.location.tracker',
                 body=json.dumps(data).encode("utf-8")
             )
 
-            #Publish to frontend visor
+            #Publish location to frontend visor
             self.channel.basic_publish(
                 exchange='broker',
                 routing_key='visor.location',

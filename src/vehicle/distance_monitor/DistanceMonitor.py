@@ -8,6 +8,8 @@ from pika.exceptions import AMQPConnectionError, AMQPChannelError
 
 from src.vehicle.base_sender_service import BaseSenderService
 
+#This Service is identical in the vehicle and the backend. At deployment, it takes the deployment location as an argument
+
 class DistanceMonitorService(BaseSenderService):
 
     def __init__(self):
@@ -17,6 +19,7 @@ class DistanceMonitorService(BaseSenderService):
         super().__init__()
 
     def send_data(self, addr: str, data):
+        #Send distance moni
         self.logger.info(f"Send data to {addr} with body:{str(addr)}")
 
         try:
@@ -30,6 +33,7 @@ class DistanceMonitorService(BaseSenderService):
 
 
     def receive_data(self):
+        #Receive data from data mock
         data = request.get_json()
         self.logger.info(f"Received data: {str(data)}")
         dst_front = float(data["dst_front"])
@@ -44,6 +48,7 @@ class DistanceMonitorService(BaseSenderService):
                 "time": time.time(),
                 "vin": self.vin
             }
+            #If it is deployed in the vehicle, send emergency brake command to vehicle service via HTTP. Otherwise to the central director
             self.logger.info(f"Trigger emergency brake, because frontal distance is {dst_front} < 16.0")
             if os.environ.get("SERVICE_DEPLOYMENT_LOCATION") == "vehicle":
                 self.send_data(f"http://emergency-brake-{self.vin.lower()}/trigger", trigger_data)
@@ -51,6 +56,7 @@ class DistanceMonitorService(BaseSenderService):
                 self.send_data(f"http://central-director-service/emergency", trigger_data)
 
         try:
+            #Send distance data via RabbitMQ to the frontend visor to display there
             new_data = {
                 "vin": data["vin"],
                 "dst_front": data["dst_front"],
