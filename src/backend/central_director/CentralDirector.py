@@ -43,14 +43,15 @@ def init_database():
     try:
         conn = get_db_connection()
         cur = conn.cursor()
+        cur.execute("""DROP TABLE IF EXISTS emergency_events
+                    """)
         cur.execute("""
             CREATE TABLE IF NOT EXISTS emergency_events (
                 id SERIAL PRIMARY KEY,
                 vin VARCHAR(20) NOT NULL,
                 timestamp TIMESTAMPTZ NOT NULL,
-                event_type VARCHAR(50) NOT NULL,
                 source VARCHAR(50),
-                details JSONB
+                reason VARCHAR (50)
             )
         """)
         conn.commit()
@@ -120,6 +121,7 @@ def health():
 def emergency_request():
     try:
         data = request.get_json()
+        logger.info(data)
         vin = data.get('vin')
         source = data.get('src', 'Unknown source')
         reason = data.get('rsn', 'Unknown reason')
@@ -140,7 +142,7 @@ def get_events():
         conn = get_db_connection()
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute("""
-                SELECT vin, timestamp, event_type, source, details
+                SELECT vin, timestamp, source, reason
                 FROM emergency_events
                 ORDER BY timestamp DESC
                 LIMIT 50
