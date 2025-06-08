@@ -32,6 +32,8 @@ app.add_middleware(
 
 client = httpx.AsyncClient(timeout=10)
 
+# This microservice implements the passenger API Gateway
+
 @app.get("/")
 async def getHealth():
     return {"msg": "Passenger API gateway works!"}
@@ -79,4 +81,4 @@ async def triggerEmergencyBrake(vin_lower):
 
 # --- Main execution block ---
 if __name__ == '__main__':
-    logger.info("Initializing Passenger Service...")
+    logger.info("Initializing Passenger API gateway...")

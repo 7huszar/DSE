@@ -62,7 +62,7 @@ def init_database():
         logger.error(f"Failed to initialize database: {e}", exc_info=True)
 
 def store_event(vin, source=None, reason=None):
-    # Store a significant event in the database
+    #Store the emergency brake event in the database
     try:
         conn = get_db_connection()
         cur = conn.cursor()
@@ -78,8 +78,8 @@ def store_event(vin, source=None, reason=None):
         logger.error(f"Failed to store event for {vin}: {e}", exc_info=True)
 
 
-def trigger_emergency_brake_on_vehicle(vin: str, rsn: str, src):
-    """Sends an HTTP request to the vehicle's Emergency Brake service."""
+def trigger_emergency_brake_on_vehicle(vin):
+    #Send a rabbitMQ message to the vehicles emergency break service
     logger.warning(f"ACTION: Triggering emergency brake for VIN {vin}.")
     RABBITMQ_USER = os.environ['RABBITMQ_USER']
     RABBITMQ_PWD = os.environ['RABBITMQ_PASSWORD']
@@ -165,6 +165,5 @@ def get_events():
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
-    # Initialize the database before starting the web server
     init_database()
     app.run(host='0.0.0.0', port=5000, debug=False)
