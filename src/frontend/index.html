@@ -133,13 +133,11 @@
                     this.ws.on('disconnect', (reason) => {
                         this.connected = false;
                         console.log(`Socket.IO: Disconnected from backend (${reason})`);
-                        this.addEvent(`Socket.IO: Disconnected (${reason})`); // Optional: for user-facing event log
                     });
 
                     this.ws.on('connect_error', (error) => {
                         console.error('Socket.IO connection error:', error);
                         this.connected = false;
-                        this.addEvent('Socket.IO: Connection error'); // Keep this for user log
                     });
 
                     // Listens for 'vehicle_update' events from the server
