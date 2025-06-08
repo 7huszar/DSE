@@ -67,7 +67,7 @@ class DistanceMonitorService(BaseSenderService):
             if os.environ.get("SERVICE_DEPLOYMENT_LOCATION") == "vehicle":
                 self.send_data(os.environ.get("EMERGENCY_BRAKE_BASE_URI").format(vin=self.vin.lower()), trigger_data)
             if os.environ.get("SERVICE_DEPLOYMENT_LOCATION") == "backend":
-                self.send_data(os.environ.get("CENTRAL_DIRECTOR_URI"), trigger_data)
+                self.send_data(os.environ.get("CENTRAL_DIRECTOR_URI") + "/" + self.vin.lower(), trigger_data)
 
         try:
             #Send distance data via RabbitMQ to the frontend visor to display there

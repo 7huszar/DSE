@@ -16,6 +16,9 @@ spec:
       containers:
         - name: emergency-brake
           image: localhost:32000/emergency-brake:latest
+          envFrom:
+            - configMapRef:
+                 name: broker-topic-config
           env:
             - name: RABBITMQ_USER
               valueFrom:

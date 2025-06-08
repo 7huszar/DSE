@@ -1,12 +1,18 @@
 import os
 import json
 import logging
+import signal
+import sys
+import threading
+
 import psycopg2
 import psycopg2.extras
 from datetime import datetime, timezone
 from flask import Flask, request, jsonify
 import time
 import pika
+from pika.exceptions import AMQPConnectionError, AMQPChannelError
+
 
 # Setup logging
 logging.basicConfig(
@@ -16,6 +22,37 @@ logging.basicConfig(
 logger = logging.getLogger("CentralDirector")
 
 app = Flask(__name__)
+
+RABBITMQ_USER = os.environ['RABBITMQ_USER']
+RABBITMQ_PWD = os.environ['RABBITMQ_PASSWORD']
+RABBITMQ_PORT = int(os.environ.get('RABBITMQ_PORT', 5672))
+RABBITMQ_HOST = os.environ.get("RABBITMQ_HOST", "rabbitmq")
+credentials = pika.PlainCredentials(
+    username=RABBITMQ_USER,
+    password=RABBITMQ_PWD
+)
+
+consumer_connection = pika.BlockingConnection(
+    pika.ConnectionParameters(
+        host=RABBITMQ_HOST,
+        port=RABBITMQ_PORT,
+        credentials=credentials))
+
+if(consumer_connection == None):
+    logger.error("Could not establish connection to RabbitMQ!")
+consumer_channel = consumer_connection.channel()
+
+
+CONSUMER_QUEUE = os.getenv("CENTRAL_DIRECTOR_QUEUE", "backend.central.director")
+BROKER = os.environ.get("BROKER_EXCHANGE", "broker")
+CONSUMER_ROUTING_KEY = os.getenv("CENTRAL_DIRECTOR_BACKEND", "backend.central.director")
+
+consumer_channel.queue_declare(CONSUMER_QUEUE, exclusive=False)
+consumer_channel.exchange_declare(exchange=BROKER, exchange_type='topic', durable=True)
+
+consumer_channel.queue_bind(queue=CONSUMER_QUEUE, exchange=BROKER, routing_key=CONSUMER_ROUTING_KEY)
+
+publisher_channel = consumer_connection.channel()
 
 # --- Database Functions ---
 def get_db_connection():
@@ -61,15 +98,15 @@ def init_database():
     except Exception as e:
         logger.error(f"Failed to initialize database: {e}", exc_info=True)
 
-def store_event(vin, source=None, reason=None):
+def store_event(vin, source=None, reason=None, time=None):
     #Store the emergency brake event in the database
     try:
         conn = get_db_connection()
         cur = conn.cursor()
         cur.execute("""
-            INSERT INTO emergency_events (vin, timestamp, source, reason)
+            INSERT INTO emergency_events (vin, time, src, rsn)
             VALUES (%s, %s, %s, %s)
-        """, (vin, datetime.now(timezone.utc), source, reason))
+        """, (vin, time, source, reason))
         conn.commit()
         cur.close()
         conn.close()
@@ -77,31 +114,31 @@ def store_event(vin, source=None, reason=None):
     except Exception as e:
         logger.error(f"Failed to store event for {vin}: {e}", exc_info=True)
 
+def callback(ch, method, properties, body):
+    decoded = json.loads(body.decode("utf-8"))
+    store_event(vin=decoded.get("vin"), source=decoded.get("src"), reason=decoded.get("rsn"), time=datetime.fromisoformat(decoded.get("time")))
+
+def consume():
+    global consumer_channel
+    global logger
+
+    consumer_channel.basic_consume(queue=CONSUMER_QUEUE, on_message_callback=callback, auto_ack=True)
+
+    try:
+        consumer_channel.start_consuming()
+    except (AMQPConnectionError, AMQPChannelError) as e:
+        logger.error(f"RabbitMQ connection failed while consuming {repr(e)}")
+    finally:
+        consumer_channel.close()
+
+threading.Thread(target=consume).start()
+
 
 def trigger_emergency_brake_on_vehicle(vin, rsn, src):
     #Send a rabbitMQ message to the vehicles emergency break service
     logger.warning(f"ACTION: Triggering emergency brake for VIN {vin}.")
-    RABBITMQ_USER = os.environ['RABBITMQ_USER']
-    RABBITMQ_PWD = os.environ['RABBITMQ_PASSWORD']
-    RABBITMQ_PORT = int(os.environ.get('RABBITMQ_PORT', 5672))
-    RABBITMQ_HOST = os.environ.get("RABBITMQ_HOST", "rabbitmq")
-    credentials = pika.PlainCredentials(
-        username=RABBITMQ_USER,
-        password=RABBITMQ_PWD
-    )
 
-    logger.info(f"Initiated Distance Monitor for Vehicle with VIN {vin.upper()}")
-    consumer_connection = pika.BlockingConnection(
-        pika.ConnectionParameters(
-            host=RABBITMQ_HOST,
-            port=RABBITMQ_PORT,
-            credentials=credentials))
-
-    if(consumer_connection == None):
-        logger.error("Could not establish connection to RabbitMQ!")
-    consumer_channel = consumer_connection.channel()
-
-    routing_key = os.environ.get("EMERGENCY_BRAKE_FRONTEND").format(vin=vin.upper())
+    routing_key = os.environ.get("EMERGENCY_BRAKE").format(vin=vin.upper())
 
     logger.info(f"Routing key: {routing_key}")
     body = {
@@ -109,10 +146,7 @@ def trigger_emergency_brake_on_vehicle(vin, rsn, src):
         "rsn": rsn,
         "src": src
     }
-    consumer_channel.queue_declare('', exclusive=False)
-    consumer_channel.exchange_declare(exchange=os.environ.get("BROKER_EXCHANGE"), exchange_type='topic', durable=True)
-    consumer_channel.queue_bind('',exchange=os.environ.get("BROKER_EXCHANGE"), routing_key=routing_key)
-    consumer_channel.basic_publish(exchange=os.environ.get("BROKER_EXCHANGE"), routing_key=routing_key, body=json.dumps(body).encode("utf-8"))
+    publisher_channel.basic_publish(exchange=os.environ.get("BROKER_EXCHANGE"), routing_key=routing_key, body=json.dumps(body).encode("utf-8"))
 
     logger.info("Published emergency brake to frontend emergency brake via RabbitMQ!")
 
@@ -129,12 +163,11 @@ def emergency_request(vin):
         source = data.get('src', 'Unknown source')
         reason = data.get('rsn', 'Unknown reason')
         logger.info(f"Manual emergency brake requested from '{source}' for {vin} because of {reason}")
-        store_event(vin=vin, source=source, reason=reason)
 
         # This is the new action
         trigger_emergency_brake_on_vehicle(vin=vin, src=data.get("src"), rsn=data.get("rsn"))
 
-        return jsonify({"status": "ok, command sent", time: datetime.now(timezone.utc).isoformat(timespec="microseconds")}), 200
+        return jsonify({"status": "ok, command sent", "time": datetime.now(timezone.utc).isoformat(timespec="microseconds")}), 200
     except Exception as e:
         logger.error(f"Error processing emergency request: {e}", exc_info=True)
         return jsonify({"error": "Internal Server Error"}), 500
@@ -153,8 +186,8 @@ def get_events():
             events = cur.fetchall()
 
             for event in events:
-                if 'timestamp' in event and isinstance(event['timestamp'], datetime):
-                    event['timestamp'] = event['timestamp'].isoformat()
+                if 'time' in event and isinstance(event['time'], datetime):
+                    event['time'] = event['time'].isoformat(timespec="milliseconds")
 
         conn.close()
         return jsonify({"events": events}), 200
@@ -162,6 +195,36 @@ def get_events():
     except Exception as e:
         logger.error(f"Error fetching events: {e}")
         return jsonify({"error": str(e)}), 500
+
+def handle_shutdown(self, signum, frame):
+    global logger
+    global consumer_channel
+    global publisher_channel
+    global consumer_connection
+
+    logger.info(f"Received shutdown signal ({signum}), shutting down gracefully...")
+
+    try:
+        consumer_channel.close()
+    except (AMQPConnectionError, AMQPChannelError) as e:
+        logger.warning(f"Failed to close: {repr(e)}")
+
+    try:
+        publisher_channel.close()
+    except (AMQPConnectionError, AMQPChannelError) as e:
+        logger.warning(f"Failed to close: {repr(e)}")
+
+    try:
+        consumer_connection.close()
+    except (AMQPConnectionError, AMQPChannelError) as e:
+        logger.warning(f"Failed to close: {repr(e)}")
+
+
+    logger.info("Shutdown complete.")
+    sys.exit(0)
+
+signal.signal(signal.SIGINT, handle_shutdown)
+signal.signal(signal.SIGTERM, handle_shutdown)
 
 if __name__ == '__main__':
     init_database()
