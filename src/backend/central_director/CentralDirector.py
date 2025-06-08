@@ -60,19 +60,19 @@ def init_database():
     except Exception as e:
         logger.error(f"Failed to initialize database: {e}", exc_info=True)
 
-def store_event(vin, event_type, source=None, details=None):
+def store_event(vin, source=None, reason=None):
     # Store a significant event in the database
     try:
         conn = get_db_connection()
         cur = conn.cursor()
         cur.execute("""
-            INSERT INTO emergency_events (vin, timestamp, event_type, source, details)
-            VALUES (%s, %s, %s, %s, %s)
-        """, (vin, datetime.now(timezone.utc), event_type, source, json.dumps(details) if details else None))
+            INSERT INTO emergency_events (vin, timestamp, source, reason)
+            VALUES (%s, %s, %s, %s)
+        """, (vin, datetime.now(timezone.utc), source, reason))
         conn.commit()
         cur.close()
         conn.close()
-        logger.info(f"Stored event: '{event_type}' for VIN {vin}")
+        logger.info(f"Stored emergency brake event for vin {vin} from source {source} for reason {reason} in DB")
     except Exception as e:
         logger.error(f"Failed to store event for {vin}: {e}", exc_info=True)
 
@@ -121,9 +121,10 @@ def emergency_request():
     try:
         data = request.get_json()
         vin = data.get('vin')
-        source = data.get('source', 'Unknown')
-        logger.info(f"Manual emergency brake requested from '{source}' for {vin}")
-        store_event(vin, "manual_emergency_request", source)
+        source = data.get('src', 'Unknown source')
+        reason = data.get('rsn', 'Unknown reason')
+        logger.info(f"Manual emergency brake requested from '{source}' for {vin} because of {reason}")
+        store_event(vin, source, reason)
 
         # This is the new action
         trigger_emergency_brake_on_vehicle(vin)
