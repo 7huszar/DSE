@@ -15,6 +15,9 @@ spec:
       containers:
         - name: central-director
           image: localhost:32000/central-director:latest
+          envFrom:
+            - configMapRef:
+                name: broker-topic-config
           env:
             - name: RABBITMQ_USER
               valueFrom:

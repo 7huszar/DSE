@@ -25,7 +25,7 @@ with open("vehicles.json", "r") as f:
 ### CONSTANTS START ###
 
 BASE_URI_LOC = "http://location-sender-{}/data"
-BASE_URI_MON = "http://distance-monitor-{}/data"
+BASE_URI_MON = "http://distance-monitor-{vin}-{location}/data"
 
 MAX_DST_FRONT = float(os.environ.get("MAX_DST_FRONT", 50))
 
@@ -123,9 +123,12 @@ def update_car(vehicle):
         "time": time.time()
     }
 
-    addr_mon = BASE_URI_MON.format(vehicle.vin.lower())
-
-    send_data(addr_mon, data_mon)
+    addr_mon_vehicle = BASE_URI_MON.format(vin=vehicle.vin.lower(), location="vehicle")
+    addr_mon_backend = BASE_URI_MON.format(vin=vehicle.vin.lower(), location="backend")
+    send_data(addr_mon_vehicle, data_mon)
+    logger.info("Sent data to distance monitor vehicle!")
+    send_data(addr_mon_backend, data_mon)
+    logger.info("Sent data to distance monitor backend!")
 
 threading.Thread(target=app.run, kwargs={"host": "0.0.0.0", "port": 5000}, daemon=True).start()
 time.sleep(5)

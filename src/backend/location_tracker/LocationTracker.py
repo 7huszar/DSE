@@ -4,7 +4,7 @@ import time
 import pika
 import json
 import os
-from flask import Flask
+from flask import Flask, request
 import psycopg2 as psy
 import logging
 
@@ -56,7 +56,7 @@ def run_consumer():
 
     channel = connection.channel()
     logger.info("Started consumer with connection to RabbitMQ!")
-    channel.exchange_declare(exchange='broker', exchange_type='topic')
+    channel.exchange_declare(exchange='broker', exchange_type='topic', durable=True)
     result = channel.queue_declare('', exclusive=False)
     queue_name = result.method.queue
 
@@ -89,24 +89,41 @@ def run_consumer():
 
     channel.start_consuming()
 
-@app.route('/messages')
-def check_status():
-    global msg
-    global received_cnt
-
-    payload = {
-        'key' : msg,
-        'cnt' : received_cnt
-    }
-    return json.dumps(payload).encode('UTF-8')
-
 
 @app.route('/database')
 def check_db_status():
+    limit = request.args.get("limit", type=int)
+    vin = request.args.get("vin")
+    start = request.args.get("start", type=int)
+    end = request.args.get("end", type=int)
+
+    query = "SELECT * FROM vehicle_positions"
+    conditions = []
+    params = []
+
+    if vin:
+        conditions.append("vin = %s")
+        params.append(vin)
+
+    if start is not None and end is not None:
+        conditions.append("time BETWEEN %s AND %s")
+        params.append(start)
+        params.append(end)
+
+    if conditions:
+        query += " WHERE " + " AND ".join(conditions)
+
+    query += " ORDER BY time DESC"
+
+    if limit:
+        query += " LIMIT %s"
+        params.append(limit)
+
     cur = conn.cursor()
-    cur.execute("SELECT * FROM vehicle_positions")
+    cur.execute(query, params)
     rows = cur.fetchall()
-    logger.info(rows)
+
+    logger.info("Selected the following roles from the database:" + rows)
 
     return json.dumps(rows).encode('UTF-8')
 
