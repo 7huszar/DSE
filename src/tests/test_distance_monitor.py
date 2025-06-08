@@ -18,28 +18,28 @@ class TestDistanceMonitor(unittest.TestCase):
     """Test cases for the Distance Monitor service"""
 
     def setUp(self):
-        """Set up test fixtures"""
-        # Mock environment variables
+        # 1) Env-Variablen
         os.environ['VIN'] = 'TEST001'
         os.environ['SERVICE_DEPLOYMENT_LOCATION'] = 'vehicle'
         os.environ['FLASK_HOST'] = '0.0.0.0'
         os.environ['FLASK_PORT'] = '5000'
 
-        # Create mock channel
+        # 2) Mock-Channel
         self.mock_channel = Mock()
 
-        # Patch BaseSenderService methods
-        with patch.object(DistanceMonitorService, '__init__', lambda x: None):
-            self.service = DistanceMonitorService()
-            self.service.channel = self.mock_channel
-            self.service.logger = Mock()
-            self.service.retry_queue = Mock()
-            self.service.connection_dead = Mock()
-            self.service.vin = 'TEST001'
-            self.service.last_dst_front = 0.0
-            self.service.last_time = datetime.now(timezone.utc)
-            self.service.change_rate = 0.0
-            self.service.delta_time = 1.0
+        # 3) Objekt anlegen ohne __init__
+        self.service = DistanceMonitorService.__new__(DistanceMonitorService)
+
+        # 4) Manuell alle Properties setzen
+        self.service.channel = self.mock_channel
+        self.service.logger = Mock()
+        self.service.retry_queue = Mock()
+        self.service.connection_dead = Mock()
+        self.service.vin = 'TEST001'
+        self.service.last_dst_front = 0.0
+        self.service.last_time = datetime.now(timezone.utc)
+        self.service.change_rate = 0.0
+        self.service.delta_time = 1.0
 
     @patch('requests.post')
     def test_emergency_brake_triggered_on_vehicle(self, mock_post):
