@@ -10,3 +10,4 @@ data:
   VISOR_LOCATION: "visor.location"
   VISOR_DISTANCE: "visor.distance"
   VISOR_EMERGENCY_BRAKE: "visor.emergency.brake"
+  LOCATION_TRACKER: "backend.location.tracker"

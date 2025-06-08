@@ -17,6 +17,9 @@ spec:
       containers:
         - name: distance-monitor
           image: localhost:32000/distance-monitor:latest
+          envFrom:
+            - configMapRef:
+                name: distance-monitor-config
           env:
             - name: VIN
               value: "${VIN}"

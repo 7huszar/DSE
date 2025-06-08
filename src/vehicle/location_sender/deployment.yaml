@@ -23,6 +23,8 @@ spec:
                 name: rabbit-mq-configmap
             - configMapRef:
                 name: location-sender-config
+            - configMapRef:
+                name: broker-topic-config
           env:
             - name: RABBITMQ_USER
               valueFrom:

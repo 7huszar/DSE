@@ -26,13 +26,9 @@ spec:
           envFrom:
             - configMapRef:
                 name: rabbit-mq-configmap
+            - configMapRef:
+                name: broker-topic-config
           env:
-            - name: BROKER_EXCHANGE
-              value: "broker"
-            - name: VISOR_LOCATION
-              value: "visor.location"
-            - name: VISOR_DISTANCE
-              value: "visor.distance"
             - name: RABBITMQ_USER
               valueFrom:
                 secretKeyRef:
