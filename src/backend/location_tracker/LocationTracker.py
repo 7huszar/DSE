@@ -44,7 +44,7 @@ def callback(ch, method, properties, body):
     logger.info(information)
     cur = conn.cursor()
     cur.execute("INSERT INTO vehicle_positions (vin, time, longitude, latitude) VALUES (%s, %s, %s, %s)",
-                (information['vin'], information['time'], information['long'], information['lat']))
+                (information['vin'], information['time'], information['lon'], information['lat']))
     conn.commit()
 
     logger.info('Message written to the db!')
@@ -57,7 +57,7 @@ def run_consumer():
     channel = connection.channel()
     logger.info("Started consumer with connection to RabbitMQ!")
     channel.exchange_declare(exchange='broker', exchange_type='topic', durable=True)
-    result = channel.queue_declare('', exclusive=False)
+    result = channel.queue_declare('location_tracker_queue', exclusive=False)
     queue_name = result.method.queue
 
     channel.queue_bind(exchange='broker', queue=queue_name, routing_key='backend.location.tracker')

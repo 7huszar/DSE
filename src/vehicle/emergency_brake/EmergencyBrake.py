@@ -33,7 +33,7 @@ class EmergencyBrake(BaseRabbitMqConnection):
 
         super().run()
         self.channel.exchange_declare(exchange='broker', exchange_type='topic', durable=True)
-        result = self.channel.queue_declare('', exclusive=False)
+        result = self.channel.queue_declare('emergency_brake_queue', exclusive=False)
         self.queue_name: str = result.method.queue
 
         self.app.add_url_rule('/shutdown', 'flask_shutdown', self.flask_shutdown, methods=['POST'])
