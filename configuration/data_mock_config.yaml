@@ -3,14 +3,5 @@ kind: ConfigMap
 metadata:
   name: data-mock-config
 data:
-  # in meters
-  max_dst_front: "50"
-  # in meters
-  min_dst_front: "0.5"
-  # in meters
-  max_dst_back: "50"
-  # in meters
-  min_dst_back: "0.5"
-  # in seconds
-  sampling_time: "1"
-  scenario: "car_driving_too_fast"
+  SAMPLING_TIME: "1"
+  SCENARIO: "car_driving_too_fast"

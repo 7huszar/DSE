@@ -13,11 +13,15 @@ from src.vehicle.base_sender_service import BaseSenderService
 class DistanceMonitorService(BaseSenderService):
 
     def __init__(self):
+
         self.change_rate = 0.0
         self.delta_time = 1.0
         self.last_dst_front = 0.0
         self.last_time: datetime = datetime.now(timezone.utc)
+
         self.vin: str = os.environ.get("VIN")
+        self.max_dst_front = float(os.getenv("MAX_DST_FRONT", 10.0))
+        self.min_change_rate = float(os.getenv("MIN_CHANGE_RATE", 4.0))
         super().__init__()
 
     def send_data(self, addr: str, data):
@@ -49,7 +53,7 @@ class DistanceMonitorService(BaseSenderService):
         self.last_time = time
 
         self.logger.info(self.change_rate)
-        if dst_front < 10.0 and self.change_rate > 4.0:
+        if dst_front < self.max_dst_front and self.change_rate > self.min_change_rate:
             trigger_data = {
                 "time": datetime.now(timezone.utc).isoformat(timespec="microseconds"),
                 "vin": self.vin,

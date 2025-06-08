@@ -4,8 +4,8 @@ Flask + Flask-SocketIO server that
 2. pushes every RabbitMQ message to browsers via Socket.IO
 """
 
-import os, logging
-from flask import Flask, jsonify
+import logging
+from flask import Flask
 from flask_socketio import SocketIO
 from rabbitmq_bridge import Bridge          # local module in the same folder
 

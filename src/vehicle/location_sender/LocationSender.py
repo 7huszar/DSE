@@ -1,4 +1,6 @@
 import json
+import os
+
 from flask import request, jsonify
 from pika.exceptions import AMQPConnectionError, AMQPChannelError
 
@@ -6,6 +8,14 @@ from src.vehicle.base_sender_service import BaseSenderService
 
 #This Service implements the Location Sender Service in the vehicle
 class LocationSenderService(BaseSenderService):
+
+    def __init__(self):
+        super().__init__()
+
+        self.visor_location = os.getenv("VISOR_LOCATION", "visor.location")
+        self.location_tracker = os.getenv("LOCATION_TRACKER", "backen.location.tracker")
+        self.exchange = os.getenv("BROKER_EXCHANGE", "broker")
+
 
     def receive_data(self):
         #Receive location data from data mock, as subsitute for real GPS locator
@@ -15,15 +25,15 @@ class LocationSenderService(BaseSenderService):
         try:
             #Publish location to backend location tracker
             self.channel.basic_publish(
-                exchange='broker',
-                routing_key='backend.location.tracker',
+                exchange=self.exchange,
+                routing_key=self.location_tracker,
                 body=json.dumps(data).encode("utf-8")
             )
 
             #Publish location to frontend visor
             self.channel.basic_publish(
-                exchange='broker',
-                routing_key='visor.location',
+                exchange=self.exchange,
+                routing_key=self.visor_location,
                 body=json.dumps(data).encode("utf-8")
             )
 
@@ -36,7 +46,7 @@ class LocationSenderService(BaseSenderService):
         return jsonify({"status": "ok"}), 200
 
     def get_retry_routing_key(self):
-        return "backend.location.tracker"
+        return self.location_tracker
 
 
 if __name__ == '__main__':
