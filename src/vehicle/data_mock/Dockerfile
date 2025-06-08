@@ -10,6 +10,8 @@ COPY ./src/vehicle/data_mock/vehicle.py .
 COPY ./scenarios/ ./scenarios/
 COPY vehicles.json .
 
+RUN pip install "fastapi[standard]" uvicorn
+
 RUN pip install pipreqs
 
 RUN pipreqs . --force --mode no-pin
@@ -17,7 +19,7 @@ RUN pipreqs . --force --mode no-pin
 RUN pip install -r requirements.txt
 
 # Expose the application port
-EXPOSE 5000
+EXPOSE 80
 
 # Run the application
-CMD ["python", "DataMock.py"]
+CMD ["uvicorn", "DataMock:app", "--host", "0.0.0.0", "--port", "80"]

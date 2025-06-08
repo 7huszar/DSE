@@ -16,7 +16,7 @@ spec:
         - name: data-mock
           image: localhost:32000/data-mock:latest
           ports:
-            - containerPort: 5000
+            - containerPort: 80
           env:
             - name: MAX_DST_FRONT
               valueFrom:
