@@ -328,13 +328,24 @@
             },
 
             async triggerEmergencyBrake(vin) {
+                const payload = {
+                    vin: vin,
+                    src: "Visor App",
+                    rsn: "User triggered emergency brake"
+                };
                 try {
                     const response = await fetch(this.baseUrl +  '/emergency/' + vin, {
-                        method: 'GET',
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            // add any auth headers here, e.g.:
+                            // 'Authorization': `Bearer ${this.token}`
+                        },
+                        body: JSON.stringify(payload),  // <-- stringify your JS object
                     })
                         .then(response => {
                             if (!response.ok) {
-                                alert("Blyat")
+                                alert("Failed to trigger emergency brake")
                                 throw new Error(`HTTP ${response.status}: ${response.statusText}`)
                             }
                             return response.json()

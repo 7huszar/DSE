@@ -78,7 +78,7 @@ def store_event(vin, source=None, reason=None):
         logger.error(f"Failed to store event for {vin}: {e}", exc_info=True)
 
 
-def trigger_emergency_brake_on_vehicle(vin):
+def trigger_emergency_brake_on_vehicle(vin, rsn, src):
     #Send a rabbitMQ message to the vehicles emergency break service
     logger.warning(f"ACTION: Triggering emergency brake for VIN {vin}.")
     RABBITMQ_USER = os.environ['RABBITMQ_USER']
@@ -121,16 +121,15 @@ def trigger_emergency_brake_on_vehicle(vin):
 def health():
     return jsonify({"status": "healthy"}), 200
 
-@app.route('/emergency', methods=['POST'])
-def emergency_request():
+@app.route('/emergency/<vin>', methods=['POST'])
+def emergency_request(vin):
     try:
         data = request.get_json()
         logger.info(data)
-        vin = data.get('vin')
         source = data.get('src', 'Unknown source')
         reason = data.get('rsn', 'Unknown reason')
         logger.info(f"Manual emergency brake requested from '{source}' for {vin} because of {reason}")
-        store_event(vin, source, reason)
+        store_event(vin=vin, source=source, reason=reason)
 
         # This is the new action
         trigger_emergency_brake_on_vehicle(vin=vin, src=data.get("src"), rsn=data.get("rsn"))

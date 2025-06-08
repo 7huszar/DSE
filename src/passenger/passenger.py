@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 import httpx
 import logging
@@ -60,16 +60,17 @@ async def getCentralDirectorLog():
         logger.error(f"Central Director error: {str(e)}")
         return {"error": str(e)}
 
-@app.get("/central-director/emergency/{vin_lower}")
-async def triggerEmergencyBrake(vin_lower):
-    logger.info(f"Received POST request for central director emergency brake for VIN {vin_lower}")
+@app.post("/central-director/emergency/{vin}")
+async def triggerEmergencyBrake(vin: str, request: Request):
+    logger.info(f"Received POST request for central director emergency brake for VIN {vin}")
+    payload = await request.json()
     try:
         response = await client.post(
-            CENTRAL_DIRECTOR_URI + "emergency",
+            CENTRAL_DIRECTOR_URI + "emergency/" + vin,
             json={
-                'vin': vin_lower,
-                'src': 'Frontend Manual Emergency Brake Trigger',
-                'rsn': 'Visor App'
+                'vin': vin,
+                'src': payload["src"],
+                'rsn': payload["rsn"]
             }
         )
         response.raise_for_status()

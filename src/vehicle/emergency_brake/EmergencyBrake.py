@@ -35,7 +35,7 @@ class EmergencyBrake(BaseRabbitMqConnection):
 
         super().run()
         self.channel.exchange_declare(exchange='broker', exchange_type='topic', durable=True)
-        result = self.channel.queue_declare('emergency_brake_queue', exclusive=False)
+        result = self.channel.queue_declare(f'emergency_brake_queue_{self.vin}', exclusive=False)
         self.queue_name: str = result.method.queue
 
         self.app.add_url_rule('/shutdown', 'flask_shutdown', self.flask_shutdown, methods=['POST'])
@@ -48,8 +48,8 @@ class EmergencyBrake(BaseRabbitMqConnection):
 
 
     def brake(self):
-        self.logger.info(f"Requested emergency break by http request for {self.vin}")
         data = request.get_json()
+        self.logger.info(f"Requested emergency break by http request for {self.vin} and body {data}")
         return self.trigger_brake(time=datetime.fromisoformat(data.get("time")), src=data.get("src"), rsn=data.get("rsn"))
 
     def trigger_brake(self, time: datetime, src: str, rsn: str):
@@ -108,8 +108,8 @@ class EmergencyBrake(BaseRabbitMqConnection):
         self.flask_thread.start()
 
     def callback(self, ch, method, properties, body):
-        self.logger.info(f"Requested emergency brake by async rabbitmq for {self.vin}")
         data = json.loads(body.decode("utf-8"))
+        self.logger.info(f"Requested emergency brake by async rabbitmq for {self.vin} and body {data}")
         self.trigger_brake(time=datetime.fromisoformat(data.get("time")), rsn=data.get("rsn"), src=data.get("src"))
 
     def consume(self):
