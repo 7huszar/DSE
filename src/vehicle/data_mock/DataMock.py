@@ -116,8 +116,7 @@ def update_car(vehicle):
             "vin": vehicle.vin,
             "lat": float(new_coord["lat"]),
             "lon": float(new_coord["lon"]),
-            "time": datetime.fromtimestamp(float(new_coord["internal_time"])).isoformat(timespec="microseconds"),
-            "speed": vehicle.velocity * 3.6
+            "time": datetime.fromtimestamp(float(new_coord["internal_time"])).isoformat(timespec="microseconds")
     }
 
     addr_loc = BASE_URI_LOC.format(vehicle.vin.lower())

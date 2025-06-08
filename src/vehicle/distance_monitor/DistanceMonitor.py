@@ -76,7 +76,8 @@ class DistanceMonitorService(BaseSenderService):
                 "dst_front": data["dst_front"],
                 "dst_rear": data["dst_rear"],
                 "time": data["time"],
-                "change_rate": self.change_rate
+                "change_rate": self.change_rate,
+                "speed": data["speed"]
             }
             self.channel.basic_publish(
                 exchange='broker',
