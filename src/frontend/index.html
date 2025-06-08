@@ -101,7 +101,7 @@
             map: null,
             markers: {},
             ws: null,
-            baseUrl: 'http://passenger-service'
+            baseUrl: '/central-director'
         },
         mounted() {
             this.initializeMap();
@@ -160,7 +160,6 @@
             },
 
             startPolling() {
-                this.fetchVehicleData(); // Initial fetch
             },
 
             async fetchVehicleData() {
@@ -300,21 +299,23 @@
 
             async triggerEmergencyBrake(vin) {
                 try {
-                    const response = await fetch(this.baseUrl +  '/central-director/emergency/' + vin, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({ vin: vin, source: 'Visor' })
-                    });
+                    const response = await fetch(this.baseUrl +  '/emergency/' + vin, {
+                        method: 'GET',
+                    })
+                        .then(response => {
+                            if (!response.ok) {
+                                alert("Blyat")
+                                throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+                            }
+                            return response.json()
+                        })
+                        .then(data => {
+                            this.addEvent(`Emergency brake requested for ${vin}`);
+                            alert('Emergency brake command sent successfully!');
+                        }).catch(error => {
+                            console.error('Emergency brake error:', error)
+                        });
 
-                    if (response.ok) {
-                        this.addEvent(`Emergency brake requested for ${vin}`);
-                        alert('Emergency brake command sent successfully!');
-                    } else {
-                        console.error('Failed to trigger emergency brake ' + response.body);
-                        alert('Failed to trigger emergency brake');
-                    }
                 } catch (error) {
                     console.error('Error triggering emergency brake:', error);
                     alert('Error triggering emergency brake');
