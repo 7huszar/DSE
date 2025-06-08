@@ -25,6 +25,10 @@ spec:
               value: "${VIN}"
             - name: SERVICE_DEPLOYMENT_LOCATION
               value: "${SERVICE_DEPLOYMENT_LOCATION}"
+            - name: EMERGENCY_BRAKE_BASE_URI
+              value: "http://emergency-brake-{vin}/trigger"
+            - name: CENTRAL_DIRECTOR_URI
+              value: "http://central-director-service/emergency"
             - name: RABBITMQ_USER
               valueFrom:
                 secretKeyRef:
