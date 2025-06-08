@@ -47,7 +47,7 @@ docker build -t localhost:32000/passenger:latest ./src/passenger/
 docker build -t localhost:32000/visor:latest ./src/frontend/
 docker build -t localhost:32000/emergency-brake:latest -f ./src/vehicle/emergency_brake/Dockerfile .
 docker build -t localhost:32000/central-director:latest ./src/backend/central_director/
-#docker build -t localhost:32000/backend-distance-monitor:latest ./src/backend/distance_monitor/
+docker build -t localhost:32000/bridge:latest ./src/frontend/bridge/
 
 echo "==================== PUSHING DOCKER IMAGES ===================="
 docker push localhost:32000/location-tracker:latest
@@ -58,7 +58,7 @@ docker push localhost:32000/visor:latest
 docker push localhost:32000/distance-monitor:latest
 docker push localhost:32000/emergency-brake:latest
 docker push localhost:32000/central-director:latest
-#docker push localhost:32000/backend-distance-monitor:latest
+docker push localhost:32000/bridge:latest
 
 echo "==================== APPLYING CONFIGURATIONS ===================="
 microk8s kubectl apply -f ./configuration/data_mock_config.yaml

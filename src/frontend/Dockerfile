@@ -1,14 +1,8 @@
-FROM python:3.12-slim
+FROM nginx:alpine
 
-COPY . /app
-WORKDIR /app
-
-RUN pip install pipreqs
-
-RUN pipreqs . --force --mode no-pin
-
-RUN pip install -r requirements.txt
+COPY style.css index.html /usr/share/nginx/html/
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 80
 
-CMD ["python", "app.py"]
+CMD ["nginx", "-g", "daemon off;"]

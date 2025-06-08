@@ -16,9 +16,16 @@ spec:
     spec:
       containers:
         - name: visor
-          image: localhost:32000/visor:latest     # same image, now contains bridge code
+          image: localhost:32000/visor:latest
           ports:
             - containerPort: 80
+        - name: bridge
+          image: localhost:32000/bridge:latest
+          ports:
+              - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: rabbit-mq-configmap
           env:
             - name: BROKER_EXCHANGE
               value: "broker"
@@ -26,13 +33,16 @@ spec:
               value: "visor.location"
             - name: VISOR_DISTANCE
               value: "visor.distance"
-          resources:
-            requests:
-              cpu: "100m"
-              memory: "64Mi"
-            limits:
-              cpu: "200m"
-              memory: "128Mi"
+            - name: RABBITMQ_USER
+              valueFrom:
+                secretKeyRef:
+                  name: rabbitmq-default-user
+                  key: username
+            - name: RABBITMQ_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: rabbitmq-default-user
+                  key: password
 ---
 apiVersion: v1
 kind: Service

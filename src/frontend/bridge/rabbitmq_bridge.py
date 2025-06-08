@@ -17,6 +17,7 @@ class Bridge(BaseRabbitMqConnection):
         self.vehicles: dict[str, dict] = {}
 
         super().__init__(run_retry_queue=False)          # opens conn+chan
+        super().run()
         q = self.channel.queue_declare(queue="", exclusive=True).method.queue
         self.channel.exchange_declare(self.exchange, exchange_type="topic", durable=True)
         self.channel.queue_bind(q, self.exchange, self.visor_loc_rk)
