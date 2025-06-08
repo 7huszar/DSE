@@ -5,9 +5,10 @@ import time
 import logging
 from vehicle import Vehicle
 import requests
-from flask import Flask, jsonify
 import numpy as np
 import importlib
+
+from fastapi import FastAPI
 
 
 
@@ -17,7 +18,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger("DataMock")
 
-app = Flask(__name__)
+app = FastAPI()
 
 with open("vehicles.json", "r") as f:
     vehicle_config = json.load(f)
@@ -73,12 +74,20 @@ print("Init data mock with car(s):")
 for vehicle in vehicles:
     print(vehicle.__str__())
 
-@app.route("/brake/<vin>", methods=["POST"])
-def trigger_break(vin: str):
+@app.get("/")
+async def healthCheck():
+    return {'msg':'Application up and healthy!'}
+
+@app.post("/brake/{vin}")
+async def trigger_break(vin):
+    if not vehicles.get(vin):
+        logger.error(f"VIN {vin} not found!")
+        return {"error": f"VIN {vin} not found!"}, 404
+
     logger.info(f"Emergency break triggered for {vin}")
     vehicles.get(vin).velocity = 0.0
     vehicles[vin].acceleration = 0.0
-    return jsonify({"vin": vin, "time": time.time()}), 200
+    return {"vin": vin, "time": time.time()}, 200
 
 def send_data(addr: str, data):
     logger.info(f"Send data to {addr} with body:{data}")
@@ -130,9 +139,15 @@ def update_car(vehicle):
     send_data(addr_mon_backend, data_mon)
     logger.info("Sent data to distance monitor backend!")
 
-threading.Thread(target=app.run, kwargs={"host": "0.0.0.0", "port": 5000}, daemon=True).start()
-time.sleep(5)
-while True:
-    for vehicle in vehicles.values():
-        update_car(vehicle)
-    time.sleep(SAMPLING_TIME)
+def background_loop():
+    logger.info("Starting background data loop...")
+    while True:
+        for vehicle in vehicles.values():
+            update_car(vehicle)
+        time.sleep(SAMPLING_TIME)
+
+@app.on_event("startup")
+def startup_event():
+    logger.info("Launching background thread for data mock...")
+    thread = threading.Thread(target=background_loop, daemon=True)
+    thread.start()
