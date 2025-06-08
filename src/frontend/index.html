@@ -101,7 +101,7 @@
             map: null,
             markers: {},
             ws: null,
-            baseUrl: 'passenger-service'
+            baseUrl: 'http://passenger-service'
         },
         mounted() {
             this.initializeMap();
@@ -312,7 +312,7 @@
                         this.addEvent(`Emergency brake requested for ${vin}`);
                         alert('Emergency brake command sent successfully!');
                     } else {
-                        console.error('Failed to trigger emergency brake');
+                        console.error('Failed to trigger emergency brake ' + response.body);
                         alert('Failed to trigger emergency brake');
                     }
                 } catch (error) {
